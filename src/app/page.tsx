@@ -11,7 +11,7 @@ export default function HomePage() {
   useEffect(() => {
     async function loadData() {
       const { data, error } = await supabase
-        .from<TestRow>('test_table')
+        .from('test_table')
         .select('id, name')
       if (error) console.error('Supabase error:', error)
       else if (data) setRows(data)
