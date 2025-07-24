@@ -1,3 +1,4 @@
+// src/app/dashboard/files/upload/page.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -11,51 +12,62 @@ export default function UploadPage() {
   const router = useRouter()
   const { loading } = useUser()
 
-  const [file, setFile] = useState<File | null>(null)
-  const [commesse, setCommesse] = useState<string[]>([])
-  const [commessa, setCommessa] = useState('')
+  const [file, setFile]             = useState<File | null>(null)
+  const [orgs, setOrgs]             = useState<Organizzazione[]>([])
+  const [orgId, setOrgId]           = useState<number | null>(null)
+  const [commesse, setCommesse]     = useState<string[]>([])
+  const [commessa, setCommessa]     = useState('')
+  const [isNewCommessa, setIsNew]   = useState(false)
+  const [newCommessa, setNewComm]   = useState('')
   const [descrizione, setDescrizione] = useState('')
-  const [orgs, setOrgs] = useState<Organizzazione[]>([])
-  const [orgId, setOrgId] = useState<number | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
+  const [error, setError]           = useState<string | null>(null)
+  const [saving, setSaving]         = useState(false)
 
-  // Carica le organizzazioni all’avvio
+  // 1) load orgs
   useEffect(() => {
-    if (!loading) {
-      listOrg().then(setOrgs).catch(console.error)
-    }
+    if (!loading) listOrg().then(setOrgs).catch(console.error)
   }, [loading])
 
-  // Ogni volta che cambia orgId, carica le commesse relative
+  // 2) when org changes, reload commesse
   useEffect(() => {
     if (orgId !== null) {
       listCommesseByOrg(orgId)
         .then(setCommesse)
-        .catch(err => {
-          console.error('Errore caricamento commesse:', err)
-          setCommesse([])
-        })
+        .catch(() => setCommesse([]))
+      setCommessa('')
+      setIsNew(false)
+      setNewComm('')
     } else {
       setCommesse([])
       setCommessa('')
+      setIsNew(false)
+      setNewComm('')
     }
   }, [orgId])
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+
     if (!file)          return setError('Seleziona un file')
     if (!orgId)         return setError("Seleziona un'organizzazione")
-    if (!commessa)      return setError('Seleziona una commessa')
-    
+    // either existing or new commessa
+    if (!commessa && !isNewCommessa)  return setError('Seleziona o crea una commessa')
+    if (isNewCommessa && !newCommessa.trim()) return setError('Inserisci il nome della nuova commessa')
+
+    const finalCommessa = isNewCommessa ? newCommessa.trim() : commessa
+
     setSaving(true)
     try {
-      await uploadFile(file, commessa, descrizione || null, orgId)
+      await uploadFile(file, finalCommessa, descrizione || null, orgId)
       router.push('/dashboard/files')
     } catch (err: unknown) {
       console.error(err)
-      setError(err instanceof Error ? err.message : String(err))
+      if (err instanceof Error) {
+        setError(err.message || 'Errore in upload')
+      } else {
+        setError('Errore in upload')
+      }
     } finally {
       setSaving(false)
     }
@@ -67,6 +79,7 @@ export default function UploadPage() {
     <div className="p-8 max-w-md mx-auto">
       <h1 className="text-2xl font-bold mb-6">Carica File</h1>
       {error && <div className="mb-4 text-red-600">{error}</div>}
+
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Organizzazione */}
         <div>
@@ -74,7 +87,7 @@ export default function UploadPage() {
           <select
             className="w-full p-2 border rounded"
             value={orgId ?? ''}
-            onChange={e => setOrgId(Number(e.target.value))}
+            onChange={e => setOrgId(Number(e.target.value) || null)}
             disabled={saving}
           >
             <option value="">Seleziona...</option>
@@ -84,20 +97,51 @@ export default function UploadPage() {
           </select>
         </div>
 
-        {/* Commessa filtrata */}
+        {/* Commessa: esistente o nuova */}
         <div>
           <label className="block mb-1">Commessa</label>
-          <select
-            className="w-full p-2 border rounded"
-            value={commessa}
-            onChange={e => setCommessa(e.target.value)}
-            disabled={saving || orgId === null}
-          >
-            <option value="">Seleziona...</option>
-            {commesse.map(c =>
-              <option key={c} value={c}>{c}</option>
-            )}
-          </select>
+          {!isNewCommessa ? (
+            <div className="flex gap-2">
+              <select
+                className="flex-1 p-2 border rounded"
+                value={commessa}
+                onChange={e => setCommessa(e.target.value)}
+                disabled={saving || orgId === null}
+              >
+                <option value="">Seleziona...</option>
+                {commesse.map(c =>
+                  <option key={c} value={c}>{c}</option>
+                )}
+              </select>
+              <button
+                type="button"
+                onClick={() => setIsNew(true)}
+                className="px-3 bg-gray-200 rounded"
+                disabled={saving}
+              >
+                + Nuova
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                className="flex-1 p-2 border rounded"
+                placeholder="Nome nuova commessa"
+                value={newCommessa}
+                onChange={e => setNewComm(e.target.value)}
+                disabled={saving}
+              />
+              <button
+                type="button"
+                onClick={() => { setIsNew(false); setNewComm('') }}
+                className="px-3 bg-red-200 rounded"
+                disabled={saving}
+              >
+                Annulla
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Descrizione */}
@@ -119,6 +163,7 @@ export default function UploadPage() {
             accept=".stl,.step"
             onChange={e => setFile(e.target.files?.[0] || null)}
             disabled={saving}
+            className="block"
           />
         </div>
 

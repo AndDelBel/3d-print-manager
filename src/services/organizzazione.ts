@@ -45,26 +45,15 @@ export async function getOrgById(id: number): Promise<Organizzazione> {
 
 // restituisce tutte le organizzazioni associate all'utente autenticato
 export async function listUserOrgs(): Promise<Organizzazione[]> {
-  // 1) prendi l'utente
   const { data: userData, error: userErr } = await supabase.auth.getUser()
   if (userErr || !userData.user) throw userErr || new Error('Utente non autenticato')
   const userId = userData.user.id
 
-  // 2) fai la query includendo TUTTI i campi di organizzazione
   const { data, error } = await supabase
     .from('organizzazioni_utente')
-    .select(`
-      organizzazione (
-        id,
-        nome,
-        is_admin,
-        created_at
-      )
-    `)
+    .select('organizzazione(id,nome,is_admin,created_at)')
     .eq('user_id', userId)
 
   if (error) throw error
-
-  // 3) data è di tipo { organizzazione: Organizzazione }[]
-  return data.map(row => row.organizzazione)
+  return data.map(row => row.organizzazione);
 }

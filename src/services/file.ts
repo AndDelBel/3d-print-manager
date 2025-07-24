@@ -98,12 +98,13 @@ export async function uploadFile(
 
 // 2) Lista file per l’utente (RLS fa il resto)
 export async function listFiles(): Promise<FileRecord[]> {
+  // Non serve più filtrare manualmente il tipo: RLS fa il suo lavoro.
   const { data, error } = await supabase
     .from('file')
     .select('*')
-    .order('data_caricamento', { ascending: false })
-  if (error) throw error
-  return data || []
+    .order('data_caricamento', { ascending: false });
+  if (error) throw error;
+  return data || [];
 }
 
 // 3) Ottieni signed URL per il download
@@ -148,42 +149,45 @@ export async function listFilesByOrgAndComm(
 }
 
 
+// src/services/file.ts
 export async function uploadGcodeFile(
   file: File,
   commessa: string,
   descrizione: string | null,
-  organizzazione_id: number
+  organizzazione_id: number,
+  organizzazione_nome: string,
+  originalBase: string
 ): Promise<string> {
-  // upload in bucket
-  const originalBase = file.name
-    .replace(/\.[^/.]+$/, '')
-    .replace(/\s+/g, '_')
-    .toLowerCase()
-  const ext = file.name.split('.').pop() || ''
-  const timestamp = Date.now()
-  const storageKey = `${organizzazione_id}/${commessa}/${originalBase}.${timestamp}.${ext}`
+  // 1) prendi userId
+  const { data: ud, error: ue } = await supabase.auth.getUser()
+  if (ue || !ud.user) throw ue || new Error('Utente non autenticato')
+  const userId = ud.user.id
 
+  // 2) costruisci storageKey con nome-org e originalBase
+  const timestamp = Date.now()
+  const storageKey = `${organizzazione_nome}/${commessa}/${originalBase}.${timestamp}.gcode.3mf`
+
+  // 3) upload
   const { error: upErr } = await supabase
-    .storage
-    .from('files')
+    .storage.from('files')
     .upload(storageKey, file, { upsert: false })
   if (upErr) throw upErr
 
-  // crea record in tabella `file`
+  // 4) inserisci record DB
   const { data, error: dbErr } = await supabase
     .from('file')
     .insert([{
       nome_file:         storageKey,
       commessa,
       descrizione,
-      user_id:           supabase.auth.getUser().then(r => r.data.user!.id),
+      user_id:           userId,
       organizzazione_id,
-      tipo:              ext === '3mf' ? 'gcode.3mf' : ext as string
+      tipo:              'gcode.3mf'
     }])
     .select('nome_file')
     .single()
-  if (dbErr || !data) throw dbErr || new Error('Upload record fallito')
 
+  if (dbErr || !data) throw dbErr || new Error('Upload record fallito')
   return data.nome_file
 }
 
@@ -198,5 +202,14 @@ export async function associateGcodeFile(
     .from('file')
     .update({ gcode_nome_file: gcodeNome })
     .eq('nome_file', originalNome)
+  if (error) throw error
+}
+
+export async function markFileSuperato(nome_file: string): Promise<void> {
+  const { error } = await supabase
+    .from('file')
+    .update({ is_superato: true })
+    .eq('nome_file', nome_file)
+
   if (error) throw error
 }
