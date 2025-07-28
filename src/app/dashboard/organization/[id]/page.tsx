@@ -10,9 +10,12 @@ import {
   deleteOrg
 } from '@/services/organizzazione'
 import type { Organizzazione } from '@/types/organizzazione'
+import { AlertMessage } from '@/components/AlertMessage'
+import { LoadingButton } from '@/components/LoadingButton'
+import { ConfirmModal } from '@/components/ConfirmModal'
 
 export default function OrgDetailPage() {
-  const { loading } = useUser()
+  const { loading, user } = useUser()
   const router = useRouter()
   const { id } = useParams<{ id: string }>()
   const [org, setOrg] = useState<Organizzazione | null>(null)
@@ -20,20 +23,25 @@ export default function OrgDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [canEdit, setCanEdit] = useState(false)
 
   // carica i dettagli
   useEffect(() => {
-    if (!loading && id) {
+    if (!loading && id && user) {
       getOrgById(Number(id))
         .then(o => {
           setOrg(o)
           setNome(o.nome)
+          // Permetti modifica solo se superuser o admin di questa org
+          setCanEdit(user.is_superuser || o.is_admin)
         })
         .catch(err => {
           console.error('Errore fetch org:', err)
         })
     }
-  }, [loading, id])
+  }, [loading, id, user])
 
   if (loading || !org) return <p>Caricamento…</p>
 
@@ -58,24 +66,27 @@ export default function OrgDetailPage() {
   }
 
   const handleDelete = async () => {
-    if (!confirm('Sei sicuro di voler eliminare questa organizzazione?')) return
     setDeleting(true)
+    setError(null)
+    setSuccess(null)
     try {
       await deleteOrg(org.id)
-      router.push('/dashboard/organization')
+      setSuccess('Organizzazione eliminata con successo!')
+      setTimeout(() => router.push('/dashboard/organization'), 1000)
     } catch (err: unknown) {
-      console.error(err)
       if (err instanceof Error) setError(err.message)
       else setError(String(err))
     } finally {
       setDeleting(false)
+      setConfirmOpen(false)
     }
   }
 
   return (
-    <div className="p-8 max-w-md mx-auto">
+    <div className="max-w-md mx-auto">
       <h1 className="text-2xl font-bold mb-6">Modifica Organizzazione</h1>
-      {error && <div className="mb-4 text-red-600">{error}</div>}
+      {error && <AlertMessage type="error" message={error} onClose={() => setError(null)} />}
+      {success && <AlertMessage type="success" message={success} onClose={() => setSuccess(null)} />}
       <form onSubmit={handleUpdate} className="space-y-4">
         <label className="block">
           <span className="text-sm font-medium">Nome organizzazione</span>
@@ -84,27 +95,40 @@ export default function OrgDetailPage() {
             value={nome}
             onChange={e => setNome(e.target.value)}
             className="mt-1 block w-full p-2 border rounded"
-            disabled={saving || deleting}
+            disabled={saving || deleting || !canEdit}
           />
         </label>
         <div className="flex space-x-4">
-          <button
+          <LoadingButton
             type="submit"
-            disabled={saving || deleting}
+            loading={saving}
+            loadingText="Salvataggio…"
             className="flex-1 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50"
+            disabled={!canEdit}
           >
             {saving ? 'Salvataggio…' : 'Aggiorna'}
-          </button>
-          <button
+          </LoadingButton>
+          <LoadingButton
             type="button"
-            onClick={handleDelete}
-            disabled={saving || deleting}
+            loading={deleting}
+            loadingText="Eliminazione…"
+            onClick={() => setConfirmOpen(true)}
             className="flex-1 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+            disabled={!canEdit}
           >
             {deleting ? 'Eliminazione…' : 'Elimina'}
-          </button>
+          </LoadingButton>
         </div>
       </form>
+      <ConfirmModal
+        open={confirmOpen}
+        title="Conferma eliminazione"
+        message="Sei sicuro di voler eliminare questa organizzazione?"
+        confirmText="Elimina"
+        cancelText="Annulla"
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   )
 }

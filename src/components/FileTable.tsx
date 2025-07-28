@@ -2,13 +2,15 @@
 import React, { useMemo } from 'react'
 import { parseDisplayName } from '@/utils/fileUtils'
 import { filterBySearch } from '@/utils/filterUtils'
-import type { FileRecord } from '@/types/file'
+import type { FileOrigine } from '@/types/fileOrigine'
 import type { Ordine } from '@/types/ordine'
+import type { Gcode } from '@/types/gcode'
+import { LoadingButton } from '@/components/LoadingButton'
 
 /**
  * Un item può essere un FileRecord o un Ordine (con proprietà file_ordinato)
  */
-export type FileItem = FileRecord & Partial<Ordine>
+export type FileItem = FileOrigine & Partial<Ordine> & { is_superato?: boolean }
 
 export interface FileTableProps<T extends FileItem> {
   items: T[]
@@ -21,9 +23,13 @@ export interface FileTableProps<T extends FileItem> {
   onFilterOrgChange: (org: string) => void
   onFilterCommChange: (comm: string) => void
   onDownload: (path: string) => void
-  onAssociate?: (original: string) => void
-  onModifyAssociation?: (original: string) => void
+  onAssociate?: (original: T) => void
+  onModifyAssociation?: (original: T) => void
   onStatusChange?: (id: number, newStatus: T['stato']) => void
+  gcodeLoading?: boolean
+  onDelete?: (item: T) => void
+  gcodeMap: Map<number, Gcode[]>
+  onMarkSuperato?: (item: T) => void
 }
 
 export function FileTable<T extends FileItem>({
@@ -39,10 +45,14 @@ export function FileTable<T extends FileItem>({
   onDownload,
   onAssociate,
   onModifyAssociation,
-  onStatusChange
+  onStatusChange,
+  gcodeLoading,
+  onDelete,
+  gcodeMap,
+  onMarkSuperato
 }: FileTableProps<T>) {
   // Determina path corretto per file_ordinato o nome_file
-  const getPath = (i: FileItem) => i.file_ordinato ?? i.nome_file
+  const getPath = (i: FileItem) => i.nome_file
 
   // Lista uniche organizzazioni (primo segmento del path)
   const orgs = useMemo(
@@ -129,41 +139,81 @@ export function FileTable<T extends FileItem>({
           {filtered.map(i => {
             const path = getPath(i)
             const [org, comm] = path.split('/')
+            const gcodeList = gcodeMap.get(i.id)
+            console.log('FileTable row', { id: i.id, nome_file: i.nome_file, gcode: gcodeList })
             return (
-              <tr key={path}>
+              <tr key={i.id}>
                 <td className="border px-4 py-2">{parseDisplayName(path)}</td>
                 <td className="border px-4 py-2">{comm}</td>
                 <td className="border px-4 py-2">{org}</td>
                 {isAdmin && (
                   <td className="border px-4 py-2 text-center">
-                    {i.gcode_nome_file ? (
-                      <>
-                        <button onClick={() => onDownload(i.gcode_nome_file!)} className="px-2 py-1 bg-blue-600 text-white rounded">Scarica</button>
-                        {onModifyAssociation && <button onClick={() => onModifyAssociation(path)} className="ml-2 px-2 py-1 bg-yellow-600 text-white rounded">Modifica</button>}
-                      </>
-                    ) : onAssociate ? (
-                      <button onClick={() => onAssociate(path)} className="px-2 py-1 bg-green-600 text-white rounded">Associa</button>
-                    ) : null}
+                    {Array.isArray(gcodeList) && gcodeList.length > 0 ? (
+                      gcodeList.map(g => (
+                        <span key={g.id} className="inline-flex items-center gap-2 mr-2">
+                          <LoadingButton
+                            type="button"
+                            loading={gcodeLoading ?? false}
+                            loadingText="Scarico…"
+                            onClick={() => onDownload(g.nome_file)}
+                            className="px-2 py-1 bg-blue-600 text-white rounded"
+                          >
+                            Scarica
+                          </LoadingButton>
+                          {onModifyAssociation && (
+                            <LoadingButton
+                              type="button"
+                              loading={gcodeLoading ?? false}
+                              loadingText="Salvataggio…"
+                              onClick={() => onModifyAssociation(i)}
+                              className="px-2 py-1 bg-yellow-600 text-white rounded"
+                            >
+                              Modifica
+                            </LoadingButton>
+                          )}
+                        </span>
+                      ))
+                    ) : (
+                      onAssociate && (
+                        <LoadingButton
+                          type="button"
+                          loading={gcodeLoading ?? false}
+                          loadingText="Salvataggio…"
+                          onClick={() => onAssociate(i)}
+                          className="px-2 py-1 bg-green-600 text-white rounded"
+                        >
+                          Associa
+                        </LoadingButton>
+                      )
+                    )}
                   </td>
                 )}
                 {onStatusChange && (
                   <td className="border px-4 py-2">
                     <select
-                      value={(i as any).stato || ''}
+                      value={i.stato ?? ''}
                       onChange={e => onStatusChange(i.id!, e.target.value as Ordine['stato'])}
                       className="p-1 border rounded"
                     >
-                      {['pending','printing','done','completed'].map(s => (
+                      {['processamento','in_coda','in_stampa','pronto','consegnato'].map(s => (
                         <option key={s} value={s}>{s}</option>
                       ))}
                     </select>
                   </td>
                 )}
                 <td className="border px-4 py-2 text-center">
-                  <button
-                    onClick={() => onDownload(path)}
-                    className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >Scarica</button>
+                  {isAdmin && !i.is_superato && onMarkSuperato && (
+                    <button
+                      onClick={() => onMarkSuperato(i)}
+                      className="ml-2 px-3 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+                    >Rendi superato</button>
+                  )}
+                  {isAdmin && i.is_superato && onDelete && (
+                    <button
+                      onClick={() => onDelete(i)}
+                      className="ml-2 px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700"
+                    >Elimina</button>
+                  )}
                 </td>
               </tr>
             )

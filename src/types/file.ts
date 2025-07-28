@@ -1,12 +1,14 @@
-// src/types/file.ts
+// Questo file è deprecato: usa FileOrigine e Gcode separati secondo il nuovo schema ottimizzato.
+
 export interface FileRecord {
-  nome_file:        string
-  commessa:         string
-  descrizione?:     string | null
-  organizzazione_id:number
-  user_id:          string
-  tipo:             'stl' | 'step' | 'gcode' | 'gcode.3mf'
-  data_caricamento: string
-  gcode_nome_file?: string | null
-  is_superato:      boolean   // ← nuova proprietà
+  id: number;
+  nome_file: string;
+  commessa: string;
+  descrizione: string | null;
+  organizzazione_id: number;
+  user_id: string;
+  tipo: 'stl' | 'step';
+  gcode_nome_file: string | null;
+  is_superato: boolean;
+  data_caricamento: string;
 }

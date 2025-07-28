@@ -80,16 +80,19 @@ export async function uploadFile(
     .upload(storageKey, file, { upsert: false })
   if (upErr) throw upErr
 
-  // Insert DB
+  // Insert DB (tutti i campi richiesti dal modello SQL)
   const { error: dbErr } = await supabase
     .from('file')
     .insert([{
       nome_file: storageKey,
       commessa,
       descrizione,
-      user_id: userId,
       organizzazione_id,
-      tipo: ext === 'stl' ? 'stl' : ext === 'step' ? 'step' : 'stl'
+      user_id: userId,
+      tipo: ext === 'stl' ? 'stl' : ext === 'step' ? 'step' : 'stl',
+      gcode_nome_file: null,
+      is_superato: false,
+      data_caricamento: new Date().toISOString(),
     }])
   if (dbErr) throw dbErr
 }
@@ -173,16 +176,19 @@ export async function uploadGcodeFile(
     .upload(storageKey, file, { upsert: false })
   if (upErr) throw upErr
 
-  // 4) inserisci record DB
+  // 4) inserisci record DB (tutti i campi richiesti dal modello SQL)
   const { data, error: dbErr } = await supabase
     .from('file')
     .insert([{
       nome_file:         storageKey,
       commessa,
       descrizione,
-      user_id:           userId,
       organizzazione_id,
-      tipo:              'gcode.3mf'
+      user_id:           userId,
+      tipo:              'gcode.3mf',
+      gcode_nome_file:   null,
+      is_superato:       false,
+      data_caricamento:  new Date().toISOString(),
     }])
     .select('nome_file')
     .single()
@@ -191,19 +197,6 @@ export async function uploadGcodeFile(
   return data.nome_file
 }
 
-/**
- * Associa, nel DB, il gcode appena caricato a un file originale.
- */
-export async function associateGcodeFile(
-  originalNome: string,
-  gcodeNome: string
-): Promise<void> {
-  const { error } = await supabase
-    .from('file')
-    .update({ gcode_nome_file: gcodeNome })
-    .eq('nome_file', originalNome)
-  if (error) throw error
-}
 
 export async function markFileSuperato(nome_file: string): Promise<void> {
   const { error } = await supabase
@@ -211,5 +204,13 @@ export async function markFileSuperato(nome_file: string): Promise<void> {
     .update({ is_superato: true })
     .eq('nome_file', nome_file)
 
+  if (error) throw error
+}
+
+export async function deleteFile(nome_file: string): Promise<void> {
+  const { error } = await supabase
+    .from('file')
+    .delete()
+    .eq('nome_file', nome_file)
   if (error) throw error
 }

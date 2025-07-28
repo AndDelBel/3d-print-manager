@@ -31,50 +31,58 @@ export default function RegisterPage() {
 
   return (
     <>
-      <h2 className="text-2xl font-bold mb-6">Registrati</h2>
-      {error && <div className="text-red-600 mb-4">{error}</div>}
+      <h2 className="text-2xl font-bold mb-6 text-base-content">Registrati</h2>
+      {error && <div className="alert alert-error mb-4">{error}</div>}
       <form onSubmit={handleRegister} className="space-y-4">
-        <input
-          type="text"
-          placeholder="Nome"
-          className="w-full p-2 border rounded"
-          value={nome}
-          onChange={e => setNome(e.target.value)}
-          required
-        />
-        <input
-          type="text"
-          placeholder="Cognome"
-          className="w-full p-2 border rounded"
-          value={cognome}
-          onChange={e => setCognome(e.target.value)}
-          required
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          className="w-full p-2 border rounded"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          required
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          className="w-full p-2 border rounded"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          required
-        />
+        <div className="form-control">
+          <input
+            type="text"
+            placeholder="Nome"
+            className="input input-bordered w-full"
+            value={nome}
+            onChange={e => setNome(e.target.value)}
+            required
+          />
+        </div>
+        <div className="form-control">
+          <input
+            type="text"
+            placeholder="Cognome"
+            className="input input-bordered w-full"
+            value={cognome}
+            onChange={e => setCognome(e.target.value)}
+            required
+          />
+        </div>
+        <div className="form-control">
+          <input
+            type="email"
+            placeholder="Email"
+            className="input input-bordered w-full"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        <div className="form-control">
+          <input
+            type="password"
+            placeholder="Password"
+            className="input input-bordered w-full"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            required
+          />
+        </div>
         <button
           type="submit"
-          className="w-full py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          className="btn btn-success w-full"
         >
           Registrati
         </button>
       </form>
-      <p className="mt-4 text-center">
-        Hai già un account? <a href="/auth/login" className="text-blue-600">Accedi</a>
+      <p className="mt-4 text-center text-base-content/70">
+        Hai già un account? <a href="/auth/login" className="link link-primary">Accedi</a>
       </p>
     </>
   )

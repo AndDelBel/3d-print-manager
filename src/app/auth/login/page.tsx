@@ -19,34 +19,38 @@ export default function LoginPage() {
 
   return (
     <>
-      <h2 className="text-2xl font-bold mb-6">Login</h2>
-      {error && <div className="text-red-600 mb-4">{error}</div>}
+      <h2 className="text-2xl font-bold mb-6 text-base-content">Login</h2>
+      {error && <div className="alert alert-error mb-4">{error}</div>}
       <form onSubmit={handleLogin} className="space-y-4">
-        <input
-          type="email"
-          placeholder="Email"
-          className="w-full p-2 border rounded"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-          required
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          className="w-full p-2 border rounded"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          required
-        />
+        <div className="form-control">
+          <input
+            type="email"
+            placeholder="Email"
+            className="input input-bordered w-full"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        <div className="form-control">
+          <input
+            type="password"
+            placeholder="Password"
+            className="input input-bordered w-full"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            required
+          />
+        </div>
         <button
           type="submit"
-          className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          className="btn btn-primary w-full"
         >
           Accedi
         </button>
       </form>
-      <p className="mt-4 text-center">
-        Non hai un account? <a href="/auth/register" className="text-blue-600">Registrati</a>
+      <p className="mt-4 text-center text-base-content/70">
+        Non hai un account? <a href="/auth/register" className="link link-primary">Registrati</a>
       </p>
     </>
   )

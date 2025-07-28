@@ -1,16 +1,36 @@
-'use client' // rimuovi se non serve codice client-side
+'use client'
 
-import { ReactNode } from 'react'
+import { ReactNode, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { useUser } from '@/hooks/useUser'
 
-export default function OrganizationLayout({ children }: { children: ReactNode }) {
+export default function DashboardLayout({ children }: { children: ReactNode }) {
+  const { loading, user } = useUser()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/auth/login')
+    }
+  }, [loading, user, router])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-base-100 flex items-center justify-center">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null // Will redirect to login
+  }
+
   return (
-    <div className="flex min-h-screen">
-      <aside className="w-64 bg-gray-100 p-4">
-        {/* qui la tua sidebar */}
-      </aside>
-      <main className="flex-1 p-8">
+    <div className="min-h-screen">
+      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         {children}
-      </main>
+      </div>
     </div>
   )
 }

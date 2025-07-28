@@ -1,12 +1,19 @@
 import { supabase } from '@/lib/supabaseClient'
 import type { Organizzazione } from '@/types/organizzazione'
 
-export async function listOrg(): Promise<Organizzazione[]> {
-  const { data, error } = await supabase
-    .from('organizzazione')
-    .select('*')
+export async function listOrg({ userId, isSuperuser = false }: { userId?: string, isSuperuser?: boolean } = {}): Promise<Organizzazione[]> {
+  if (isSuperuser) {
+    const { data, error } = await supabase.from('organizzazione').select('*');
+    if (error) throw error;
+    return data || [];
+  }
+  if (!userId) throw new Error('userId richiesto per utenti non superuser');
+  const { data: orgs, error } = await supabase
+    .from('organizzazioni_utente')
+    .select('organizzazione(id,nome,created_at)')
+    .eq('user_id', userId)
   if (error) throw error
-  return data!
+  return orgs.map(row => row.organizzazione).flat();
 }
 
 export async function createOrg(nome: string): Promise<void> {
@@ -51,9 +58,9 @@ export async function listUserOrgs(): Promise<Organizzazione[]> {
 
   const { data, error } = await supabase
     .from('organizzazioni_utente')
-    .select('organizzazione(id,nome,is_admin,created_at)')
+    .select('organizzazione(id,nome,created_at)')
     .eq('user_id', userId)
 
   if (error) throw error
-  return data.map(row => row.organizzazione);
+  return data.map(row => row.organizzazione).flat();
 }

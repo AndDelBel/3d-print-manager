@@ -8,48 +8,49 @@ import type { Organizzazione } from '@/types/organizzazione'
 import Link from 'next/link'
 
 export default function OrgPage() {
-  const { loading } = useUser()
+  const { loading, user } = useUser()
   const [orgs, setOrgs] = useState<Organizzazione[]>([])
 
-  // calcolo subito isAdmin dal type
-  const isAdmin = orgs.some(o => o.is_admin)
+  const isSuperuser = user?.is_superuser
 
   useEffect(() => {
-    if (!loading) {
-      listOrg()
-        .then(setOrgs)
-        .catch(err => {
-          console.error('Errore caricamento organizzazioni:', err)
-          setOrgs([])
-        })
+    if (!loading && user) {
+      listOrg({ userId: user.id, isSuperuser }).then(setOrgs).catch(err => {
+        console.error('Errore caricamento organizzazioni:', err)
+        setOrgs([])
+      })
     }
-  }, [loading])
+  }, [loading, user, isSuperuser])
 
-  if (loading) return <p>Caricamento…</p>
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    )
+  }
 
   return (
-    <div className="p-8">
+    <div>
       <h1 className="text-2xl font-bold mb-4">Organizzazioni</h1>
       <p className="mb-4">
-        {isAdmin ? 'Sei un amministratore' : 'Non sei un amministratore'}
+        {isSuperuser ? 'Sei un superuser: vedi tutte le organizzazioni' : 'Vedi solo le tue organizzazioni'}
       </p>
-
-      {isAdmin && (
-        <Link  href="/dashboard/organization/create">
-        <button className="mb-6 px-4 py-2 bg-blue-600 text-white rounded">
+      <Link href="/dashboard/organization/create">
+        <button className="btn btn-primary mb-6">
           Crea Organizzazione
         </button>
-        </Link>
-      )}
-
+      </Link>
       <ul className="space-y-2">
         {orgs.map(o => (
-          <li key={o.id} className="p-4 border rounded">
-            <Link href={`/dashboard/organization/${o.id}`}>
-              <button className="ml-4 px-2 py-1 bg-gray-600 text-white rounded">
-                {o.nome}
-              </button>
-            </Link>
+          <li key={o.id} className="card bg-base-200">
+            <div className="card-body">
+              <Link href={`/dashboard/organization/${o.id}`}>
+                <button className="btn btn-ghost">
+                  {o.nome}
+                </button>
+              </Link>
+            </div>
           </li>
         ))}
       </ul>

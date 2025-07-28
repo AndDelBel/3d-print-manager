@@ -1,30 +1,52 @@
 // src/components/TabbedFileTable.tsx
 import React, { useState } from 'react'
 import { FileTable } from '@/components/FileTable'
-import type { FileRecord } from '@/types/file'
 import type { Ordine } from '@/types/ordine'
+import type { Gcode } from '@/types/gcode'
+import type { FileOrigine } from '@/types/fileOrigine'
 
-export type TabbedItem = FileRecord & Partial<Ordine> & { is_superato?: boolean }
+export type TabbedItem = Partial<Ordine> & { is_superato?: boolean }
 
-export interface TabbedFileTableProps<T extends TabbedItem> {
-  items: T[]
+// Extended FileOrigine type with optional is_superato property
+type FileOrigineWithSuperato = FileOrigine & { is_superato?: boolean }
+
+export interface TabbedFileTableProps {
+  items: FileOrigineWithSuperato[]
   loading: boolean
   isAdmin: boolean
+  search: string
+  filterOrg: string
+  filterComm: string
+  onSearchChange: (q: string) => void
+  onFilterOrgChange: (org: string) => void
+  onFilterCommChange: (comm: string) => void
   onDownload: (path: string) => void
-  onAssociate?: (original: string) => void
-  onModifyAssociation?: (original: string) => void
-  onStatusChange?: (id: number, newStatus: T['stato']) => void
+  onAssociate?: (original: FileOrigineWithSuperato) => void
+  onModifyAssociation?: (original: FileOrigineWithSuperato) => void
+  gcodeLoading?: boolean
+  onDelete?: (item: FileOrigineWithSuperato) => void
+  gcodeMap: Map<number, Gcode[]>
+  onMarkSuperato?: (item: FileOrigineWithSuperato) => void
 }
 
-export function TabbedFileTable<T extends TabbedItem>({
+export function TabbedFileTable({
   items,
   loading,
   isAdmin,
+  search,
+  filterOrg,
+  filterComm,
+  onSearchChange,
+  onFilterOrgChange,
+  onFilterCommChange,
   onDownload,
   onAssociate,
   onModifyAssociation,
-  onStatusChange,
-}: TabbedFileTableProps<T>) {
+  gcodeLoading,
+  onDelete,
+  gcodeMap,
+  onMarkSuperato,
+}: TabbedFileTableProps) {
   const [activeTab, setActiveTab] = useState<'attivi' | 'superati'>('attivi')
 
   const activeItems = items.filter(i => !i.is_superato)
@@ -33,16 +55,16 @@ export function TabbedFileTable<T extends TabbedItem>({
 
   return (
     <div>
-      <div className="flex gap-4 mb-4">
+      <div className="tabs tabs-boxed mb-4">
         <button
-          className={`px-4 py-2 rounded ${activeTab === 'attivi' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+          className={`tab ${activeTab === 'attivi' ? 'tab-active' : ''}`}
           onClick={() => setActiveTab('attivi')}
         >
           Attivi
         </button>
         {isAdmin && (
           <button
-            className={`px-4 py-2 rounded ${activeTab === 'superati' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+            className={`tab ${activeTab === 'superati' ? 'tab-active' : ''}`}
             onClick={() => setActiveTab('superati')}
           >
             Superati
@@ -50,20 +72,23 @@ export function TabbedFileTable<T extends TabbedItem>({
         )}
       </div>
 
-      <FileTable<T>
+      <FileTable<FileOrigineWithSuperato>
         items={displayItems}
         loading={loading}
         isAdmin={isAdmin}
-        search=""
-        filterOrg=""
-        filterComm=""
-        onSearchChange={() => {}}
-        onFilterOrgChange={() => {}}
-        onFilterCommChange={() => {}}
+        search={search}
+        filterOrg={filterOrg}
+        filterComm={filterComm}
+        onSearchChange={onSearchChange}
+        onFilterOrgChange={onFilterOrgChange}
+        onFilterCommChange={onFilterCommChange}
         onDownload={onDownload}
         onAssociate={onAssociate}
         onModifyAssociation={onModifyAssociation}
-        onStatusChange={onStatusChange}
+        gcodeLoading={gcodeLoading}
+        onDelete={onDelete}
+        gcodeMap={gcodeMap}
+        onMarkSuperato={onMarkSuperato}
       />
     </div>
   )
