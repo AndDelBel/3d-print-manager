@@ -1,5 +1,5 @@
 // src/components/TabbedFileTable.tsx
-import React, { useState } from 'react'
+import React, { useState, useMemo, useCallback } from 'react'
 import { FileTable } from '@/components/FileTable'
 import type { FileRecord } from '@/types/file'
 import type { Ordine } from '@/types/ordine'
@@ -16,7 +16,7 @@ export interface TabbedFileTableProps<T extends TabbedItem> {
   onStatusChange?: (id: number, newStatus: T['stato']) => void
 }
 
-export function TabbedFileTable<T extends TabbedItem>({
+export const TabbedFileTable = React.memo(function TabbedFileTable<T extends TabbedItem>({
   items,
   loading,
   isAdmin,
@@ -26,40 +26,81 @@ export function TabbedFileTable<T extends TabbedItem>({
   onStatusChange,
 }: TabbedFileTableProps<T>) {
   const [activeTab, setActiveTab] = useState<'attivi' | 'superati'>('attivi')
+  const [search, setSearch] = useState('')
+  const [filterOrg, setFilterOrg] = useState('')
+  const [filterComm, setFilterComm] = useState('')
 
-  const activeItems = items.filter(i => !i.is_superato)
-  const expiredItems = items.filter(i => !!i.is_superato)
-  const displayItems = activeTab === 'attivi' ? activeItems : expiredItems
+  // Memoize filtered items for better performance
+  const { activeItems, expiredItems } = useMemo(() => {
+    const active = items.filter(i => !i.is_superato)
+    const expired = items.filter(i => !!i.is_superato)
+    return { activeItems: active, expiredItems: expired }
+  }, [items])
+
+  const displayItems = useMemo(() => {
+    return activeTab === 'attivi' ? activeItems : expiredItems
+  }, [activeTab, activeItems, expiredItems])
+
+  // Memoize callbacks to prevent unnecessary re-renders
+  const handleTabChange = useCallback((tab: 'attivi' | 'superati') => {
+    setActiveTab(tab)
+    // Reset filters when changing tabs
+    setSearch('')
+    setFilterOrg('')
+    setFilterComm('')
+  }, [])
+
+  const handleSearchChange = useCallback((query: string) => {
+    setSearch(query)
+  }, [])
+
+  const handleFilterOrgChange = useCallback((org: string) => {
+    setFilterOrg(org)
+    // Reset commessa filter when org changes
+    setFilterComm('')
+  }, [])
+
+  const handleFilterCommChange = useCallback((comm: string) => {
+    setFilterComm(comm)
+  }, [])
 
   return (
     <div>
       <div className="flex gap-4 mb-4">
         <button
-          className={`px-4 py-2 rounded ${activeTab === 'attivi' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
-          onClick={() => setActiveTab('attivi')}
+          className={`px-4 py-2 rounded transition-colors ${
+            activeTab === 'attivi' 
+              ? 'bg-blue-600 text-white' 
+              : 'bg-gray-200 hover:bg-gray-300'
+          }`}
+          onClick={() => handleTabChange('attivi')}
         >
-          Attivi
+          Attivi ({activeItems.length})
         </button>
         {isAdmin && (
           <button
-            className={`px-4 py-2 rounded ${activeTab === 'superati' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
-            onClick={() => setActiveTab('superati')}
+            className={`px-4 py-2 rounded transition-colors ${
+              activeTab === 'superati' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-200 hover:bg-gray-300'
+            }`}
+            onClick={() => handleTabChange('superati')}
           >
-            Superati
+            Superati ({expiredItems.length})
           </button>
         )}
       </div>
 
-      <FileTable<T>
+      <FileTable
         items={displayItems}
         loading={loading}
         isAdmin={isAdmin}
-        search=""
-        filterOrg=""
-        filterComm=""
-        onSearchChange={() => {}}
-        onFilterOrgChange={() => {}}
-        onFilterCommChange={() => {}}
+        search={search}
+        filterOrg={filterOrg}
+        filterComm={filterComm}
+        onSearchChange={handleSearchChange}
+        onFilterOrgChange={handleFilterOrgChange}
+        onFilterCommChange={handleFilterCommChange}
         onDownload={onDownload}
         onAssociate={onAssociate}
         onModifyAssociation={onModifyAssociation}
@@ -67,4 +108,4 @@ export function TabbedFileTable<T extends TabbedItem>({
       />
     </div>
   )
-}
+})

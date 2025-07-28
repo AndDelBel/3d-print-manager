@@ -17,7 +17,7 @@ export default function FilesPage() {
     if (!loading) {
       listFiles().then(setFiles).catch(console.error)
       listUserOrgs()
-        .then(orgs => setIsAdmin(orgs.some(o => o.is_admin)))
+        .then(orgs => setIsAdmin(orgs.some(o => o.role === 'admin')))
         .catch(console.error)
     }
   }, [loading])
@@ -50,38 +50,33 @@ export default function FilesPage() {
     }
   }
 
+  const handleAssociate = (originalPath: string) => {
+    // Find the FileRecord corresponding to the path
+    const originalFile = files.find(f => f.nome_file === originalPath)
+    if (!originalFile) return
+
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.3mf'
+    input.onchange = () => {
+      const file = input.files?.[0]
+      if (file) handleGcodeAction(originalFile, file)
+    }
+    input.click()
+  }
+
   if (loading) return <p>Caricamento…</p>
 
   return (
     <div className="p-8">
       <h1 className="text-2xl font-bold mb-4">Elenco File</h1>
-      <TabbedFileTable<FileRecord>
+      <TabbedFileTable
         items={files}
         loading={loading}
         isAdmin={isAdmin}
         onDownload={handleDownload}
-        onAssociate={orig => {
-          // show file picker, then call handleGcodeAction
-          const input = document.createElement('input')
-          input.type = 'file'
-          input.accept = '.3mf'
-          input.onchange = () => {
-            const file = input.files?.[0]
-            if (file) handleGcodeAction(orig, file)
-          }
-          input.click()
-        }}
-        onModifyAssociation={orig => {
-          // same as onAssociate
-          const input = document.createElement('input')
-          input.type = 'file'
-          input.accept = '.3mf'
-          input.onchange = () => {
-            const file = input.files?.[0]
-            if (file) handleGcodeAction(orig, file)
-          }
-          input.click()
-        }}
+        onAssociate={handleAssociate}
+        onModifyAssociation={handleAssociate}
       />
     </div>
   )

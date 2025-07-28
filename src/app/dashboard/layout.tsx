@@ -1,16 +1,27 @@
-'use client' // rimuovi se non serve codice client-side
+'use client'
 
-import { ReactNode } from 'react'
+import { CacheManager } from '@/components/CacheManager'
+import { useUser } from '@/hooks/useUser'
 
-export default function OrganizationLayout({ children }: { children: ReactNode }) {
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const { loading } = useUser()
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Caricamento...</p>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex min-h-screen">
-      <aside className="w-64 bg-gray-100 p-4">
-        {/* qui la tua sidebar */}
-      </aside>
-      <main className="flex-1 p-8">
-        {children}
-      </main>
+    <div className="min-h-screen bg-gray-50">
+      <CacheManager />
+      <main>{children}</main>
     </div>
   )
 }

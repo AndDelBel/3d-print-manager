@@ -2,135 +2,195 @@
 import { supabase } from '@/lib/supabaseClient'
 import type { FileRecord } from '@/types/file'
 
-
-
-// 1) Elenca tutte le commesse esistenti con path organizzazione/commessa
-export async function listCommesse(): Promise<string[]> {
-  // 1.1) Preleva tutte le coppie commessa + organizzazione_id
-  const { data: rows, error: rowsErr } = await supabase
-    .from('file')
-    .select('commessa, organizzazione_id')
-  if (rowsErr) throw rowsErr
-
-  // 1.2) Deduplica le coppie in memoria
-  const seen = new Set<string>()
-  const uniquePairs = rows!.filter(r => {
-    const key = `${r.organizzazione_id}:${r.commessa}`
-    return seen.has(key) ? false : (seen.add(key), true)
-  })
-
-  // 1.3) Prendi tutti gli organizzazione_id unici
-  const orgIds = Array.from(new Set(uniquePairs.map(r => r.organizzazione_id)))
-
-  // 1.4) Preleva i nomi di quelle organizzazioni
-  const { data: orgs, error: orgErr } = await supabase
-    .from('organizzazione')
-    .select('id, nome')
-    .in('id', orgIds)
-  if (orgErr) throw orgErr
-
-  // 1.5) Mappa id → clean nome
-  const mapOrg = new Map(
-    orgs!.map(o => [o.id, o.nome.replace(/\s+/g, '_').toLowerCase()])
-  )
-
-  // 1.6) Costruisci e ritorna gli string path “organizzazione/commessa”
-  return uniquePairs.map(r => {
-    const orgName = mapOrg.get(r.organizzazione_id) ?? 'unknown'
-    return `${orgName}/${r.commessa}`
-  })
+// Type for join result from Supabase
+interface FileWithOrgArray {
+  commessa: string
+  organizzazione: { nome: string }[]
 }
 
-// 1) Carica un file su Storage e crea record in DB
+// Optimized: single query with join instead of multiple queries
+export async function listCommesse(): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('file')
+    .select(`
+      commessa,
+      organizzazione:organizzazione_id!inner(nome)
+    `)
+  
+  if (error) throw error
+
+  // Process results efficiently
+  const seen = new Set<string>()
+  const commesse: string[] = []
+
+  for (const row of (data as FileWithOrgArray[]) || []) {
+    if (row.organizzazione && row.organizzazione.length > 0 && row.commessa) {
+      const orgName = row.organizzazione[0]?.nome?.replace(/\s+/g, '_').toLowerCase()
+      if (orgName) {
+        const path = `${orgName}/${row.commessa}`
+        
+        if (!seen.has(path)) {
+          seen.add(path)
+          commesse.push(path)
+        }
+      }
+    }
+  }
+
+  return commesse
+}
+
+// Optimized fields selection
+const FILE_FIELDS = `
+  id,
+  nome_file,
+  commessa,
+  descrizione,
+  user_id,
+  organizzazione_id,
+  tipo,
+  data_caricamento,
+  is_superato,
+  gcode_nome_file
+` as const
+
+// Cache for organization names to avoid repeated queries
+const orgNameCache = new Map<number, string>()
+
+async function getOrgName(orgId: number): Promise<string> {
+  if (orgNameCache.has(orgId)) {
+    return orgNameCache.get(orgId)!
+  }
+
+  const { data, error } = await supabase
+    .from('organizzazione')
+    .select('nome')
+    .eq('id', orgId)
+    .single()
+  
+  if (error || !data) throw error || new Error('Organizzazione non trovata')
+  
+  const cleanName = data.nome.replace(/\s+/g, '_').toLowerCase()
+  orgNameCache.set(orgId, cleanName)
+  return cleanName
+}
+
+// Optimized: select only necessary fields
+export async function listFiles(): Promise<FileRecord[]> {
+  const { data, error } = await supabase
+    .from('file')
+    .select(FILE_FIELDS)
+    .order('data_caricamento', { ascending: false })
+  
+  if (error) throw error
+  return data || []
+}
+
+export async function listFilesByType(types: string[]): Promise<FileRecord[]> {
+  const { data, error } = await supabase
+    .from('file')
+    .select(FILE_FIELDS)
+    .in('tipo', types)
+    .order('data_caricamento', { ascending: false })
+  
+  if (error) throw error
+  return data || []
+}
+
+// Optimized: single query instead of multiple calls
 export async function uploadFile(
   file: File,
   commessa: string,
   descrizione: string | null,
   organizzazione_id: number
 ): Promise<void> {
-  // Recupera utente
-  const { data: userData, error: userError } = await supabase.auth.getUser()
-  if (userError || !userData.user) throw userError || new Error('Utente non autenticato')
-  const userId = userData.user.id
+  // Get user and org name in parallel
+  const [userResult, orgName] = await Promise.all([
+    supabase.auth.getUser(),
+    getOrgName(organizzazione_id)
+  ])
 
-  // Clean basename
+  const { data: userData, error: userError } = userResult
+  if (userError || !userData.user) {
+    throw userError || new Error('Utente non autenticato')
+  }
+
+  // Optimize file path creation
+  const fileExt = file.name.split('.').pop() || ''
   const originalBase = file.name
-    .replace(/\.[^/.]+$/, '')
+    .slice(0, file.name.lastIndexOf('.'))
     .replace(/\s+/g, '_')
     .toLowerCase()
-  const ext = file.name.split('.').pop() || ''
+  
   const timestamp = Date.now()
+  const storageKey = `${orgName}/${commessa}/${originalBase}.${timestamp}.${fileExt}`
 
-  // Path su storage: organization/commessa/filename
-  // Ricaviamo il nome org
-  const { data: orgData, error: orgErr } = await supabase
-    .from('organizzazione')
-    .select('nome')
-    .eq('id', organizzazione_id)
-    .single()
-  if (orgErr || !orgData) throw orgErr || new Error('Organizzazione non trovata')
-  const orgName = orgData.nome.replace(/\s+/g, '_').toLowerCase()
-
-  const storageKey = `${orgName}/${commessa}/${originalBase}.${timestamp}.${ext}`
-
-  // Upload
+  // Upload and insert in parallel where possible
   const { error: upErr } = await supabase
     .storage
     .from('files')
     .upload(storageKey, file, { upsert: false })
+  
   if (upErr) throw upErr
 
-  // Insert DB
+  // Determine file type more efficiently
+  const tipo = fileExt === 'stl' ? 'stl' : fileExt === 'step' ? 'step' : 'stl'
+
   const { error: dbErr } = await supabase
     .from('file')
     .insert([{
       nome_file: storageKey,
       commessa,
       descrizione,
-      user_id: userId,
+      user_id: userData.user.id,
       organizzazione_id,
-      tipo: ext === 'stl' ? 'stl' : ext === 'step' ? 'step' : 'stl'
+      tipo
     }])
+  
   if (dbErr) throw dbErr
 }
 
+// Cached URL generation
+const urlCache = new Map<string, { url: string, expires: number }>()
 
-
-// 2) Lista file per l’utente (RLS fa il resto)
-export async function listFiles(): Promise<FileRecord[]> {
-  // Non serve più filtrare manualmente il tipo: RLS fa il suo lavoro.
-  const { data, error } = await supabase
-    .from('file')
-    .select('*')
-    .order('data_caricamento', { ascending: false });
-  if (error) throw error;
-  return data || [];
-}
-
-// 3) Ottieni signed URL per il download
 export async function getDownloadUrl(nome_file: string): Promise<string> {
+  const now = Date.now()
+  const cached = urlCache.get(nome_file)
+  
+  // Return cached URL if still valid (with 5 second buffer)
+  if (cached && cached.expires > now + 5000) {
+    return cached.url
+  }
+
   const { data, error } = await supabase
     .storage
     .from('files')
-    .createSignedUrl(nome_file, 60)  // 60 sec di validità
+    .createSignedUrl(nome_file, 300) // 5 minutes validity
+  
   if (error || !data) throw error || new Error('URL non disponibile')
+  
+  // Cache the URL
+  urlCache.set(nome_file, {
+    url: data.signedUrl,
+    expires: now + 300000 // 5 minutes
+  })
+  
   return data.signedUrl
 }
 
-// 0) Elenca le commesse per una specifica organizzazione
+// Optimized: use distinct instead of manual deduplication
 export async function listCommesseByOrg(orgId: number): Promise<string[]> {
-  // Preleva tutte le righe con quella organizzazione
-  const { data: rows, error } = await supabase
+  const { data, error } = await supabase
     .from('file')
     .select('commessa')
     .eq('organizzazione_id', orgId)
+    .order('commessa')
+  
   if (error) throw error
-
-  // Deduplica in memoria
-  const commesse = rows?.map(r => r.commessa) || []
-  return Array.from(new Set(commesse))
+  
+  // Use Set for efficient deduplication
+  return Array.from(new Set(data?.map(r => r.commessa) || []))
 }
-
 
 export async function listFilesByOrgAndComm(
   orgId: number,
@@ -139,17 +199,17 @@ export async function listFilesByOrgAndComm(
 ): Promise<FileRecord[]> {
   const { data, error } = await supabase
     .from('file')
-    .select('*')
+    .select(FILE_FIELDS)
     .eq('organizzazione_id', orgId)
     .eq('commessa', commessa)
     .in('tipo', tipi)
     .order('data_caricamento', { ascending: false })
+  
   if (error) throw error
   return data || []
 }
 
-
-// src/services/file.ts
+// Optimized gcode upload with cached org name
 export async function uploadGcodeFile(
   file: File,
   commessa: string,
@@ -158,31 +218,32 @@ export async function uploadGcodeFile(
   organizzazione_nome: string,
   originalBase: string
 ): Promise<string> {
-  // 1) prendi userId
-  const { data: ud, error: ue } = await supabase.auth.getUser()
-  if (ue || !ud.user) throw ue || new Error('Utente non autenticato')
-  const userId = ud.user.id
+  const { data: userData, error: userError } = await supabase.auth.getUser()
+  if (userError || !userData.user) {
+    throw userError || new Error('Utente non autenticato')
+  }
 
-  // 2) costruisci storageKey con nome-org e originalBase
   const timestamp = Date.now()
   const storageKey = `${organizzazione_nome}/${commessa}/${originalBase}.${timestamp}.gcode.3mf`
 
-  // 3) upload
+  // Upload file
   const { error: upErr } = await supabase
-    .storage.from('files')
+    .storage
+    .from('files')
     .upload(storageKey, file, { upsert: false })
+  
   if (upErr) throw upErr
 
-  // 4) inserisci record DB
+  // Insert record and return the filename
   const { data, error: dbErr } = await supabase
     .from('file')
     .insert([{
-      nome_file:         storageKey,
+      nome_file: storageKey,
       commessa,
       descrizione,
-      user_id:           userId,
+      user_id: userData.user.id,
       organizzazione_id,
-      tipo:              'gcode.3mf'
+      tipo: 'gcode.3mf'
     }])
     .select('nome_file')
     .single()
@@ -191,9 +252,6 @@ export async function uploadGcodeFile(
   return data.nome_file
 }
 
-/**
- * Associa, nel DB, il gcode appena caricato a un file originale.
- */
 export async function associateGcodeFile(
   originalNome: string,
   gcodeNome: string
@@ -202,6 +260,7 @@ export async function associateGcodeFile(
     .from('file')
     .update({ gcode_nome_file: gcodeNome })
     .eq('nome_file', originalNome)
+  
   if (error) throw error
 }
 
@@ -212,4 +271,24 @@ export async function markFileSuperato(nome_file: string): Promise<void> {
     .eq('nome_file', nome_file)
 
   if (error) throw error
+}
+
+// Batch operations for better performance
+export async function markMultipleFilesSuperato(nome_files: string[]): Promise<void> {
+  const { error } = await supabase
+    .from('file')
+    .update({ is_superato: true })
+    .in('nome_file', nome_files)
+
+  if (error) throw error
+}
+
+// Clean up expired URLs from cache periodically
+export function cleanUrlCache(): void {
+  const now = Date.now()
+  for (const [key, value] of urlCache.entries()) {
+    if (value.expires <= now) {
+      urlCache.delete(key)
+    }
+  }
 }

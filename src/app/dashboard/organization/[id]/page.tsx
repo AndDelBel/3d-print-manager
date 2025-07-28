@@ -26,8 +26,12 @@ export default function OrgDetailPage() {
     if (!loading && id) {
       getOrgById(Number(id))
         .then(o => {
-          setOrg(o)
-          setNome(o.nome)
+          if (o) {
+            setOrg(o)
+            setNome(o.nome)
+          } else {
+            console.error('Organization not found')
+          }
         })
         .catch(err => {
           console.error('Errore fetch org:', err)
@@ -37,21 +41,14 @@ export default function OrgDetailPage() {
 
   if (loading || !org) return <p>Caricamento…</p>
 
-  const handleUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setError(null)
-    if (!nome.trim()) {
-      setError('Il nome non può essere vuoto')
-      return
-    }
+  const handleSave = async () => {
+    if (!org || nome.trim() === '') return
     setSaving(true)
     try {
-      await updateOrg(org.id, nome.trim())
+      await updateOrg(org.id, { nome: nome.trim() })
       router.push('/dashboard/organization')
     } catch (err: unknown) {
       console.error(err)
-      if (err instanceof Error) setError(err.message)
-      else setError(String(err))
     } finally {
       setSaving(false)
     }
@@ -76,7 +73,7 @@ export default function OrgDetailPage() {
     <div className="p-8 max-w-md mx-auto">
       <h1 className="text-2xl font-bold mb-6">Modifica Organizzazione</h1>
       {error && <div className="mb-4 text-red-600">{error}</div>}
-      <form onSubmit={handleUpdate} className="space-y-4">
+      <form onSubmit={handleSave} className="space-y-4">
         <label className="block">
           <span className="text-sm font-medium">Nome organizzazione</span>
           <input

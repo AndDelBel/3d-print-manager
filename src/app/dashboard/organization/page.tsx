@@ -1,27 +1,24 @@
 // src/app/dashboard/organization/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useUser } from '@/hooks/useUser'
-import { listOrg } from '@/services/organizzazione'
+import { listOrg, listUserOrgs, type UserOrgRelation } from '@/services/organizzazione'
 import type { Organizzazione } from '@/types/organizzazione'
 import Link from 'next/link'
 
-export default function OrgPage() {
+export default function OrganizationPage() {
   const { loading } = useUser()
   const [orgs, setOrgs] = useState<Organizzazione[]>([])
+  const [userOrgs, setUserOrgs] = useState<UserOrgRelation[]>([])
 
-  // calcolo subito isAdmin dal type
-  const isAdmin = orgs.some(o => o.is_admin)
+  // Check if user is admin in any organization
+  const isAdmin = userOrgs.some(o => o.role === 'admin')
 
   useEffect(() => {
     if (!loading) {
-      listOrg()
-        .then(setOrgs)
-        .catch(err => {
-          console.error('Errore caricamento organizzazioni:', err)
-          setOrgs([])
-        })
+      listOrg().then(setOrgs).catch(console.error)
+      listUserOrgs().then(setUserOrgs).catch(console.error)
     }
   }, [loading])
 
