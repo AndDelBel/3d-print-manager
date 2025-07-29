@@ -1,6 +1,5 @@
-import type { Config } from "tailwindcss";
-
-const config: Config = {
+/** @type {import('tailwindcss').Config} */
+module.exports = {
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -14,10 +13,8 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
-  // @ts-expect-error - daisyui types not available
+  plugins: [require("daisyui")],
   daisyui: {
     themes: ["light", "dark"],
   },
-};
-export default config;
+}; 
