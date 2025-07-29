@@ -3,30 +3,40 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "build:css": "npx @tailwindcss/cli -i app.css -o public/output.css"
+    "analyze": "ANALYZE=true next build",
+    "build:analyze": "npm run build && npx @next/bundle-analyzer .next",
+    "perf": "npm run build && npm run start",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf .next && rm -rf out"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.52.1",
     "next": "15.4.3",
-    "next-themes": "^0.4.4",
     "react": "19.1.0",
     "react-dom": "19.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@next/bundle-analyzer": "^15.4.3",
+    "@tailwindcss/postcss": "^4.1.11",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.21",
-    "daisyui": "^5.0.48",
     "eslint": "^9",
     "eslint-config-next": "15.4.3",
     "postcss": "^8.5.6",
-    "tailwindcss": "^3.4.17",
-    "typescript": "^5"
+    "swc-loader": "^0.1.0",
+    "tailwindcss": "^4.1.11",
+    "typescript": "^5",
+    "webpack-bundle-analyzer": "^4.10.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
   }
 }
