@@ -14,7 +14,7 @@ export default function HomePage() {
         .from('test_table')
         .select('id, name')
       if (error) console.error('Supabase error:', error)
-      else if (data) setRows(data)
+      else if (data) setRows(data as TestRow[])
     }
     loadData()
   }, [])
