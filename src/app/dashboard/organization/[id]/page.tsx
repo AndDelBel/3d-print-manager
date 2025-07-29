@@ -34,8 +34,8 @@ export default function OrgDetailPage() {
         .then(o => {
           setOrg(o)
           setNome(o.nome)
-          // Permetti modifica solo se superuser o admin di questa org
-          setCanEdit(user.is_superuser || o.is_admin)
+          // Permetti modifica solo se superuser
+          setCanEdit(user.is_superuser)
         })
         .catch(err => {
           console.error('Errore fetch org:', err)

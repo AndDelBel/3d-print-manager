@@ -8,7 +8,6 @@ import { listCodaStampa } from '@/services/codaStampa'
 import type { Organizzazione } from '@/types/organizzazione'
 import type { CodaStampa } from '@/types/codaStampa'
 import { AlertMessage } from '@/components/AlertMessage'
-import { LoadingButton } from '@/components/LoadingButton'
 
 export default function CodaStampaPage() {
   const { loading, user } = useUser()
@@ -29,7 +28,7 @@ export default function CodaStampaPage() {
     if (!loading) {
       listCodaStampa({ organizzazione_id: isSuperuser ? undefined : orgId, isSuperuser })
         .then(setCoda)
-        .catch(err => setError('Errore caricamento coda stampa'))
+        .catch(() => setError('Errore caricamento coda stampa'))
     }
   }, [loading, orgId, isSuperuser])
 

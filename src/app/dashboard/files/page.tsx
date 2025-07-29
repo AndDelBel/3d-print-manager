@@ -7,7 +7,7 @@ import { useUser } from '@/hooks/useUser'
 import { listOrg } from '@/services/organizzazione'
 import { listCommesse } from '@/services/commessa'
 import { listFileOrigine, deleteFileOrigine } from '@/services/fileOrigine'
-import { listGcode, uploadGcode, deleteGcode } from '@/services/gcode'
+import { listGcode, uploadGcode } from '@/services/gcode'
 import { TabellaFile } from '@/components/TabellaFile'
 import type { RigaFile } from '@/components/RigaTabellaFile'
 import type { FileOrigine } from '@/types/fileOrigine'
@@ -29,9 +29,8 @@ export default function FilesPage() {
   const [search, setSearch] = useState('')
   const [gcodeError, setGcodeError] = useState<string | null>(null)
   const [gcodeSuccess, setGcodeSuccess] = useState<string | null>(null)
-  const [gcodeLoading, setGcodeLoading] = useState(false)
+
   const [deleteTarget, setDeleteTarget] = useState<FileOrigine | null>(null)
-  const [deleteLoading, setDeleteLoading] = useState(false)
   const [gcodeMap, setGcodeMap] = useState<Map<number, Gcode[]>>(new Map())
 
   const isSuperuser = user?.is_superuser
@@ -86,7 +85,7 @@ export default function FilesPage() {
             // Carica i G-code per i file caricati
             if (fileList.length > 0) {
               try {
-                const results = await Promise.all(fileList.map(f => listGcode({ file_origine_id: f.id, isSuperuser })))
+                const results = await Promise.all(fileList.map(f => listGcode({ file_origine_id: f.id })))
                 // Mappa fileOrigine.id -> array di Gcode SOLO se almeno uno presente
                 const gcodeMap = new Map<number, Gcode[]>()
                 fileList.forEach((f, idx) => {
@@ -123,7 +122,7 @@ export default function FilesPage() {
               // Carica i G-code per i file caricati
               if (allFiles.length > 0) {
                 try {
-                  const results = await Promise.all(allFiles.map(f => listGcode({ file_origine_id: f.id, isSuperuser })))
+                  const results = await Promise.all(allFiles.map(f => listGcode({ file_origine_id: f.id })))
                   // Mappa fileOrigine.id -> array di Gcode SOLO se almeno uno presente
                   const gcodeMap = new Map<number, Gcode[]>()
                   allFiles.forEach((f, idx) => {
@@ -153,7 +152,6 @@ export default function FilesPage() {
   const handleGcodeAction = async (original: FileOrigine, file?: File) => {
     setGcodeError(null)
     setGcodeSuccess(null)
-    setGcodeLoading(true)
     try {
       if (file) {
         await uploadGcode(file, original.id, {})
@@ -164,7 +162,7 @@ export default function FilesPage() {
           
           // Ricarica i G-code
           if (fileList.length > 0) {
-            const results = await Promise.all(fileList.map(f => listGcode({ file_origine_id: f.id, isSuperuser })))
+            const results = await Promise.all(fileList.map(f => listGcode({ file_origine_id: f.id })))
             const gcodeMap = new Map<number, Gcode[]>()
             fileList.forEach((f, idx) => {
               const arr = results[idx]
@@ -187,7 +185,7 @@ export default function FilesPage() {
             
             // Ricarica i G-code
             if (allFiles.length > 0) {
-              const results = await Promise.all(allFiles.map(f => listGcode({ file_origine_id: f.id, isSuperuser })))
+              const results = await Promise.all(allFiles.map(f => listGcode({ file_origine_id: f.id })))
               const gcodeMap = new Map<number, Gcode[]>()
               allFiles.forEach((f, idx) => {
                 const arr = results[idx]
@@ -205,14 +203,12 @@ export default function FilesPage() {
       setGcodeError('Errore upload/associazione G-code')
       console.error('Errore upload/associazione G-code:', err)
     } finally {
-      setGcodeLoading(false)
     }
   }
 
   // Handler eliminazione file
   const handleDelete = async () => {
     if (!deleteTarget) return
-    setDeleteLoading(true)
     setGcodeError(null)
     setGcodeSuccess(null)
     try {
@@ -224,7 +220,7 @@ export default function FilesPage() {
         
         // Ricarica i G-code
         if (fileList.length > 0) {
-          const results = await Promise.all(fileList.map(f => listGcode({ file_origine_id: f.id, isSuperuser })))
+          const results = await Promise.all(fileList.map(f => listGcode({ file_origine_id: f.id })))
           const gcodeMap = new Map<number, Gcode[]>()
           fileList.forEach((f, idx) => {
             const arr = results[idx]
@@ -249,7 +245,7 @@ export default function FilesPage() {
           
           // Ricarica i G-code
           if (allFiles.length > 0) {
-            const results = await Promise.all(allFiles.map(f => listGcode({ file_origine_id: f.id, isSuperuser })))
+            const results = await Promise.all(allFiles.map(f => listGcode({ file_origine_id: f.id })))
             const gcodeMap = new Map<number, Gcode[]>()
             allFiles.forEach((f, idx) => {
               const arr = results[idx]
@@ -268,7 +264,6 @@ export default function FilesPage() {
       setGcodeError('Errore eliminazione file')
       console.error('Errore eliminazione file:', err)
     } finally {
-      setDeleteLoading(false)
       setDeleteTarget(null)
     }
   }

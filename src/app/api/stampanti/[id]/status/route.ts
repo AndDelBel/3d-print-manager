@@ -20,7 +20,7 @@ export async function GET(
           getAll() {
             return cookieStore.getAll()
           },
-          setAll(cookiesToSet) {
+          setAll(cookiesToSet: Array<{ name: string; value: string; options?: Record<string, unknown> }>) {
             try {
               cookiesToSet.forEach(({ name, value, options }) =>
                 cookieStore.set(name, value, options)
@@ -139,7 +139,7 @@ export async function GET(
           printStats = await printStatusResponse.json()
         }
 
-        const status: any = { // Cast to any to allow dynamic properties
+        const status: Record<string, unknown> = {
           stampante_id: stampante.id,
           stato: 'pronta',
           temperatura_nozzle: temperatureData.result?.status?.extruder?.temperature,
@@ -192,7 +192,7 @@ export async function GET(
 
         const data = await response.json()
 
-        const status: any = { // Cast to any to allow dynamic properties
+        const status: Record<string, unknown> = {
           stampante_id: stampante.id,
           stato: data.state || 'pronta',
           temperatura_nozzle: data.temperature?.nozzle,

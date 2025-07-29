@@ -9,7 +9,7 @@ interface APILog {
   endpoint: string
   success: boolean
   error?: string
-  data?: any
+  data?: Record<string, unknown>
 }
 
 interface APILogViewerProps {

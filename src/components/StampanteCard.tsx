@@ -1,24 +1,25 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import type { Stampante, StampanteStatus } from '@/types/stampante'
 import { getStampanteStatus } from '@/services/stampante'
 
 interface StampanteCardProps {
   stampante: Stampante
-  onRefresh?: () => void
+
   onEdit?: (stampante: Stampante) => void
   onDelete?: (id: number) => void
+  onRefresh?: () => void
   isSuperuser?: boolean
 }
 
-export function StampanteCard({ stampante, onRefresh, onEdit, onDelete, isSuperuser }: StampanteCardProps) {
+export function StampanteCard({ stampante, onEdit, onDelete, onRefresh, isSuperuser }: StampanteCardProps) {
   const [status, setStatus] = useState<StampanteStatus | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [controlLoading, setControlLoading] = useState<string | null>(null)
 
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     setLoading(true)
     setError(null)
 
@@ -39,9 +40,9 @@ export function StampanteCard({ stampante, onRefresh, onEdit, onDelete, isSuperu
     } finally {
       setLoading(false)
     }
-  }
+  }, [stampante])
 
-  const handleControl = async (action: string, params?: any) => {
+  const handleControl = async (action: string, params?: Record<string, unknown>) => {
     if (!isSuperuser) return
 
     setControlLoading(action)
@@ -77,7 +78,7 @@ export function StampanteCard({ stampante, onRefresh, onEdit, onDelete, isSuperu
     // Aggiorna ogni 30 secondi
     const interval = setInterval(fetchStatus, 30000)
     return () => clearInterval(interval)
-  }, [stampante.id])
+  }, [stampante.id, fetchStatus])
 
   const getStatusColor = (stato: string) => {
     switch (stato) {
@@ -127,7 +128,10 @@ export function StampanteCard({ stampante, onRefresh, onEdit, onDelete, isSuperu
             {getStatusIcon(status?.stato || 'offline')} {status?.stato || 'offline'}
           </span>
           <button
-            onClick={fetchStatus}
+            onClick={() => {
+              fetchStatus()
+              onRefresh?.()
+            }}
             disabled={loading}
             className="p-1 opacity-70 hover:opacity-100 disabled:opacity-50"
             title="Aggiorna"

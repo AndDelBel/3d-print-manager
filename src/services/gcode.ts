@@ -8,7 +8,7 @@ function cleanName(str: string): string {
     .toLowerCase()
 }
 
-export async function listGcode({ file_origine_id, isSuperuser = false }: { file_origine_id?: number, isSuperuser?: boolean }): Promise<Gcode[]> {
+export async function listGcode({ file_origine_id }: { file_origine_id?: number }): Promise<Gcode[]> {
   let query = supabase.from('gcode').select('*').order('data_caricamento', { ascending: false });
   
   if (file_origine_id) {

@@ -3,11 +3,9 @@
 import React, { useEffect, useState } from 'react'
 import { useUser } from '@/hooks/useUser'
 import { listStampanti } from '@/services/stampante'
-import { listOrdini } from '@/services/ordine'
+import { listOrders } from '@/services/ordine'
 import { listCommesse } from '@/services/commessa'
-import type { Stampante } from '@/types/stampante'
-import type { Ordine } from '@/types/ordine'
-import type { Commessa } from '@/types/commessa'
+
 
 interface AnalyticsData {
   totalPrinters: number
@@ -27,7 +25,8 @@ interface AnalyticsData {
 }
 
 export default function AnalyticsPage() {
-  const { user, isSuperuser } = useUser()
+  const { user } = useUser()
+  const isSuperuser = user?.is_superuser || false
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -42,8 +41,8 @@ export default function AnalyticsPage() {
 
         // Fetch dati
         const [stampanti, ordini, commesse] = await Promise.all([
-          listStampanti({ isSuperuser }),
-          listOrdini({ isSuperuser }),
+          listStampanti(),
+          listOrders({ isSuperuser }),
           listCommesse({ isSuperuser })
         ])
 

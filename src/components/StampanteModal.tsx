@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import type { Stampante } from '@/types/stampante'
-import type { Organizzazione } from '@/types/organizzazione'
+
 import { LoadingButton } from './LoadingButton'
 
 interface StampanteModalProps {
@@ -73,7 +73,7 @@ export function StampanteModal({
     }
   }
 
-  const handleInputChange = (field: keyof Stampante, value: any) => {
+  const handleInputChange = (field: keyof Stampante, value: string | boolean | undefined) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 

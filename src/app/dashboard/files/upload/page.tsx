@@ -82,7 +82,7 @@ export default function UploadPage() {
         setCommessaId(finalCommessaId)
         setIsNew(false)
         setNewComm('')
-      } catch (err) {
+      } catch {
         setSaving(false)
         setError('Errore creazione commessa')
         return

@@ -7,9 +7,9 @@ import { useUser } from '@/hooks/useUser'
 import { listOrders, updateOrderStatus, deleteOrder, updateOrderGcode } from '@/services/ordine'
 import { listOrg } from '@/services/organizzazione'
 import { listCommesse } from '@/services/commessa'
-import { listGcode, getGcodeDownloadUrl } from '@/services/gcode'
+import { listGcode } from '@/services/gcode'
 import { listFileOrigineByIds } from '@/services/fileOrigine'
-import { parseDisplayName } from '@/utils/fileUtils'
+
 import { filterBySearch } from '@/utils/filterUtils'
 import type { Ordine } from '@/types/ordine'
 import { AlertMessage } from '@/components/AlertMessage'
@@ -32,7 +32,7 @@ export default function OrdersPage() {
   const [filterComm, setFilterComm] = useState('')
   const [statusError, setStatusError] = useState<string | null>(null)
   const [statusSuccess, setStatusSuccess] = useState<string | null>(null)
-  const [statusLoadingId, setStatusLoadingId] = useState<number | null>(null)
+
   const [deleteTarget, setDeleteTarget] = useState<Ordine | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [gcodeChangeTarget, setGcodeChangeTarget] = useState<Ordine | null>(null)
@@ -85,7 +85,7 @@ export default function OrdersPage() {
           
           for (const gcodeId of gcodeIds) {
             try {
-              const gcodeList = await listGcode({ file_origine_id: undefined, isSuperuser })
+              const gcodeList = await listGcode({ file_origine_id: undefined })
               const gcode = gcodeList.find(g => g.id === gcodeId)
               if (gcode) {
                 gcodeMap.set(gcodeId, gcode)
@@ -134,23 +134,9 @@ export default function OrdersPage() {
     return fileOrigineMap.get(gcode.file_origine_id)
   }
 
-  const handleGcodeDownload = async (gcodeId: number) => {
-    const gcode = gcodes.get(gcodeId)
-    if (!gcode) return
-    
-    try {
-      const url = await getGcodeDownloadUrl(gcode.nome_file)
-      window.open(url, '_blank')
-    } catch (err) {
-      console.error('Errore download G-code:', err)
-    }
-  }
 
-  // Estrai commesse uniche per filtro
-  const commesse = useMemo(() =>
-    Array.from(new Set(orders.map(o => o.commessa_id))),
-    [orders]
-  )
+
+
 
   // Commesse filtrate per l'organizzazione selezionata
   const commesseFiltrate = useMemo(() => {
@@ -201,21 +187,7 @@ export default function OrdersPage() {
     [textFiltered, orgId, filterComm, isSuperuser, orgs]
   )
 
-  const handleStatusChange = async (id: number, newStatus: Ordine['stato']) => {
-    setStatusError(null)
-    setStatusSuccess(null)
-    setStatusLoadingId(id)
-    try {
-      await updateOrderStatus(id, newStatus)
-      setOrders(await listOrders({ organizzazione_id: isSuperuser ? undefined : orgId, isSuperuser }))
-      setStatusSuccess('Stato ordine aggiornato!')
-    } catch (err) {
-      setStatusError('Errore aggiornamento stato ordine')
-      console.error('Errore aggiornamento stato ordine:', err)
-    } finally {
-      setStatusLoadingId(null)
-    }
-  }
+
 
   const handleStatusChangeFromModal = async (newStatus: Ordine['stato']) => {
     if (!statusChangeTarget) return
@@ -278,7 +250,7 @@ export default function OrdersPage() {
     
     // Carica tutti i G-code disponibili
     try {
-      const allGcodes = await listGcode({ isSuperuser: true })
+              const allGcodes = await listGcode({ file_origine_id: undefined })
       setAvailableGcodes(allGcodes)
     } catch (err) {
       console.error('Errore caricamento G-code:', err)
@@ -422,7 +394,7 @@ export default function OrdersPage() {
                     </td>
                     <td>
                       <LoadingButton
-                        loading={statusLoadingId === o.id}
+                        loading={false}
                         loadingText="Aggiorno…"
                         className="btn btn-ghost btn-xs"
                         onClick={e => e.preventDefault()}
@@ -437,7 +409,7 @@ export default function OrdersPage() {
                               o.stato === 'in_coda' ? 'badge-primary' :
                               'badge-neutral'
                             }`}
-                            disabled={statusLoadingId === o.id}
+                            disabled={false}
                           >
                             {o.stato}
                           </button>

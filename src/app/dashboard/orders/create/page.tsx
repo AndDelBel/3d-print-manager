@@ -12,7 +12,7 @@ import { createOrder, checkOrdineTableExists, createOrdineTable } from '@/servic
 import type { Organizzazione } from '@/types/organizzazione'
 import type { Commessa } from '@/types/commessa'
 import type { FileOrigine } from '@/types/fileOrigine'
-import type { Gcode } from '@/types/gcode'
+
 import { AlertMessage } from '@/components/AlertMessage'
 import { LoadingButton } from '@/components/LoadingButton'
 
@@ -87,7 +87,7 @@ export default function CreateOrderPage() {
     setSaving(true)
     try {
       // Trova il G-code associato al file selezionato
-      const gcodes = await listGcode({ file_origine_id: selectedFile, isSuperuser: user?.is_superuser })
+              const gcodes = await listGcode({ file_origine_id: selectedFile })
       if (gcodes.length === 0) {
         setError('Il file non è ancora stato revisionato, non è disponibile per ordini automatici.')
         setSaving(false)

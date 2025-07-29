@@ -1,10 +1,10 @@
-import { useRouter } from 'next/navigation'
+
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import type { Utente } from '@/types/utente'
 
 export function useUser() {
-  const router = useRouter()
+
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<Utente | null>(null)
 

@@ -9,7 +9,7 @@ import { LoadingButton } from '@/components/LoadingButton'
 
 export default function CreateOrganizationPage() {
   const router = useRouter()
-  const { loading, user } = useUser()
+  const { loading } = useUser()
   const [nome, setNome] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)

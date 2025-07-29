@@ -142,18 +142,18 @@ export async function deleteOrder(id: number): Promise<void> {
 }
 
 export async function checkGcodeExists(nome_file: string): Promise<boolean> {
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('gcode')
     .select('nome_file')
     .eq('nome_file', nome_file)
     .single()
-  return !!data && !error
+  return !error
 }
 
 // Funzione per verificare se la tabella ordine esiste
 export async function checkOrdineTableExists(): Promise<boolean> {
   try {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('ordine')
       .select('id')
       .limit(1)
@@ -194,7 +194,7 @@ export async function createOrdineTable(): Promise<void> {
   }
 }
 
-export async function listOrdersByFileOrigine(file_origine_id: number, isSuperuser = false): Promise<Ordine[]> {
+export async function listOrdersByFileOrigine(file_origine_id: number): Promise<Ordine[]> {
   // Query con join per ottenere ordini associati a un file_origine
   const { data, error } = await supabase
     .from('ordine')

@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const cookieStore = await cookies()
     const supabase = createServerClient(
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
           getAll() {
             return cookieStore.getAll()
           },
-          setAll(cookiesToSet) {
+          setAll(cookiesToSet: Array<{ name: string; value: string; options?: Record<string, unknown> }>) {
             try {
               cookiesToSet.forEach(({ name, value, options }) =>
                 cookieStore.set(name, value, options)

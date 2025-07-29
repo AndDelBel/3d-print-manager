@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { testKlipperAPI, testBambuAPI, testWithMockData } from '@/utils/printerApiTest'
+import { testWithMockData } from '@/utils/printerApiTest'
 import { LoadingButton } from '@/components/LoadingButton'
 import { AlertMessage } from '@/components/AlertMessage'
 import { APILogViewer } from '@/components/APILogViewer'
@@ -11,7 +11,7 @@ export default function TestAPIStampantiPage() {
   const [endpoint, setEndpoint] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<{ success: boolean; data?: any; error?: string } | null>(null)
+  const [result, setResult] = useState<{ success: boolean; data?: Record<string, unknown>; error?: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showLogs, setShowLogs] = useState(false)
 

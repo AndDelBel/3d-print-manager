@@ -11,7 +11,7 @@ import { StampanteCard } from '@/components/StampanteCard'
 import { StampanteModal } from '@/components/StampanteModal'
 
 export default function StampantiPage() {
-  const { loading, user } = useUser()
+  const { loading } = useUser()
   const [stampanti, setStampanti] = useState<Stampante[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loadingStampanti, setLoadingStampanti] = useState(false)
@@ -23,7 +23,7 @@ export default function StampantiPage() {
       setLoadingStampanti(true)
       listStampanti()
         .then(setStampanti)
-        .catch(err => setError('Errore caricamento stampanti'))
+        .catch(() => setError('Errore caricamento stampanti'))
         .finally(() => setLoadingStampanti(false))
     }
   }, [loading])
@@ -32,7 +32,7 @@ export default function StampantiPage() {
     setLoadingStampanti(true)
     listStampanti()
       .then(setStampanti)
-      .catch(err => setError('Errore caricamento stampanti'))
+      .catch(() => setError('Errore caricamento stampanti'))
       .finally(() => setLoadingStampanti(false))
   }
 

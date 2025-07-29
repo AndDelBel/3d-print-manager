@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { listOrdersByFileOrigine } from '@/services/ordine'
 import { listGcode, getGcodeDownloadUrl, uploadGcode, deleteGcode } from '@/services/gcode'
 import { listFileOrigineByIds, setGcodePrincipale, getGcodePrincipale, getFileOrigineDownloadUrl } from '@/services/fileOrigine'
@@ -15,7 +15,6 @@ import type { Commessa } from '@/types/commessa'
 import type { Organizzazione } from '@/types/organizzazione'
 import type { Utente } from '@/types/utente'
 import { AlertMessage } from '@/components/AlertMessage'
-import { LoadingButton } from '@/components/LoadingButton'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { updateOrderGcode } from '@/services/ordine'
 
@@ -33,7 +32,6 @@ export default function FileDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [deleteGcodeTarget, setDeleteGcodeTarget] = useState<Gcode | null>(null)
-  const [deletingGcode, setDeletingGcode] = useState(false)
   const [editingGcodeOrderId, setEditingGcodeOrderId] = useState<number | null>(null)
   const [inlineGcodeValue, setInlineGcodeValue] = useState<number | undefined>(undefined)
   const [inlineGcodeLoading, setInlineGcodeLoading] = useState(false)
@@ -61,12 +59,12 @@ export default function FileDetailPage() {
       })
       
       // Carica ordini associati
-      listOrdersByFileOrigine(file.id, true).then(setOrders).catch(err => {
+      listOrdersByFileOrigine(file.id).then(setOrders).catch(err => {
         console.error('Errore caricamento ordini:', err)
       })
       
       // Carica gcode associati
-      listGcode({ file_origine_id: file.id, isSuperuser: true }).then(setGcodes).catch(err => {
+      listGcode({ file_origine_id: file.id }).then(setGcodes).catch(err => {
         console.error('Errore caricamento G-code:', err)
       })
       
@@ -125,7 +123,7 @@ export default function FileDetailPage() {
     setSuccess(null)
     try {
       await uploadGcode(e.target.files[0], file.id, {})
-      const newGcodes = await listGcode({ file_origine_id: file.id, isSuperuser: true })
+      const newGcodes = await listGcode({ file_origine_id: file.id })
       setGcodes(newGcodes)
       setSuccess('G-code caricato con successo!')
       // Se è il primo G-code, impostalo come principale
@@ -156,12 +154,11 @@ export default function FileDetailPage() {
 
   const handleDeleteGcode = async () => {
     if (!deleteGcodeTarget || !file) return
-    setDeletingGcode(true)
     setError(null)
     setSuccess(null)
     try {
       await deleteGcode(deleteGcodeTarget.id)
-      const newGcodes = await listGcode({ file_origine_id: file.id, isSuperuser: true })
+      const newGcodes = await listGcode({ file_origine_id: file.id })
       setGcodes(newGcodes)
       
       // Se il G-code eliminato era quello principale, rimuovi il riferimento
@@ -175,7 +172,6 @@ export default function FileDetailPage() {
       setError('Errore eliminazione G-code')
       console.error(err)
     } finally {
-      setDeletingGcode(false)
       setDeleteGcodeTarget(null)
     }
   }
@@ -187,7 +183,7 @@ export default function FileDetailPage() {
     setSuccess(null)
     try {
       await updateOrderGcode(ordineId, inlineGcodeValue)
-      const updatedOrders = await listOrdersByFileOrigine(file!.id, true)
+      const updatedOrders = await listOrdersByFileOrigine(file!.id)
       setOrders(updatedOrders)
       setSuccess('G-code dell\'ordine aggiornato con successo!')
       setEditingGcodeOrderId(null)

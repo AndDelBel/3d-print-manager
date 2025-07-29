@@ -8,7 +8,7 @@ export async function GET(
     console.log('API route chiamata con ID:', params.id)
     
     // Dati mock per test
-    const mockStatus = {
+    const mockStatus: Record<string, unknown> = {
       stampante_id: parseInt(params.id),
       stato: 'pronta',
       temperatura_nozzle: 200 + Math.random() * 20,
