@@ -50,14 +50,22 @@ export default function UserAvatar({ size = 'md', className = '' }: UserAvatarPr
         bg-blue-500 
         text-white 
         font-semibold
-        flex 
-        items-center 
-        justify-center
         select-none
+        leading-none
+        tracking-wide
+        relative
         ${className}
       `}
+      style={{ 
+        lineHeight: '1'
+      }}
     >
-      {getInitials(user.nome, user.cognome)}
+      <div 
+        className="absolute inset-0 flex items-center justify-center"
+        style={{ lineHeight: '1' }}
+      >
+        {getInitials(user.nome, user.cognome)}
+      </div>
     </div>
   )
 }
