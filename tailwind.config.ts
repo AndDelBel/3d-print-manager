@@ -7,12 +7,17 @@ const config: Config = {
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        background: "var(--background)",
+        foreground: "var(--foreground)",
+      },
+    },
   },
-  plugins: [require("daisyui")],
+  plugins: [],
+  // @ts-expect-error - daisyui types not available
   daisyui: {
     themes: ["light", "dark"],
   },
 };
-
 export default config;
