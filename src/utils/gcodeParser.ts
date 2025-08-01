@@ -66,11 +66,9 @@ function parseXmlMetadata(xmlContent: string): GcodeMetadata {
       metadata.printer_brand = 'Bambu Lab'
     }
     
-    console.log('📋 Metadati XML estratti:', metadata)
     return metadata
     
   } catch (error) {
-    console.error('❌ Errore parsing XML:', error)
     return {
       error: 'Errore parsing XML',
       raw_xml: xmlContent.substring(0, 500)
@@ -84,13 +82,10 @@ function parseXmlMetadata(xmlContent: string): GcodeMetadata {
  */
 export async function extractGcodeMetadata(file: File): Promise<GcodeMetadata> {
   try {
-    console.log('🔍 Iniziando estrazione metadati...')
     const zip = new JSZip()
     const zipContent = await zip.loadAsync(file)
     
-    console.log('📦 File ZIP caricato, file contenuti:')
     const fileNames = Object.keys(zipContent.files)
-    console.log('File disponibili:', fileNames)
     
     // Cerca il file di metadati in varie posizioni possibili
     const metadataFiles = [
@@ -111,7 +106,6 @@ export async function extractGcodeMetadata(file: File): Promise<GcodeMetadata> {
     for (const filename of metadataFiles) {
       const metadataFile = zipContent.file(filename)
       if (metadataFile) {
-        console.log('✅ Trovato file metadati:', filename)
         foundFile = filename
         metadataContent = await metadataFile.async('string')
         break
@@ -120,40 +114,33 @@ export async function extractGcodeMetadata(file: File): Promise<GcodeMetadata> {
     
     if (!metadataContent) {
       // Se non troviamo i file standard, cerchiamo qualsiasi file che potrebbe contenere metadati
-      console.log('🔍 Cercando file alternativi...')
-      
       for (const fileName of fileNames) {
         if (fileName.toLowerCase().includes('metadata') || 
             fileName.toLowerCase().includes('config') ||
             fileName.toLowerCase().includes('settings') ||
             fileName.toLowerCase().includes('info') ||
             fileName.toLowerCase().includes('model')) {
-          console.log('📄 Provando file:', fileName)
           const file = zipContent.file(fileName)
           if (file) {
             try {
               const content = await file.async('string')
-              console.log('📋 Contenuto file:', fileName, ':', content.substring(0, 200) + '...')
               
               // Prova a parsare come JSON
               try {
                 const jsonContent = JSON.parse(content)
-                console.log('✅ File JSON valido trovato:', fileName)
                 foundFile = fileName
                 metadataContent = content
                 break
               } catch {
                 // Non è JSON, potrebbe essere XML
                 if (content.trim().startsWith('<?xml') || content.trim().startsWith('<model')) {
-                  console.log('✅ File XML trovato:', fileName)
                   foundFile = fileName
                   metadataContent = content
                   break
                 }
-                console.log('❌ File non è JSON o XML valido:', fileName)
               }
             } catch (err) {
-              console.log('❌ Errore lettura file:', fileName, err)
+              // Ignora errori di lettura
             }
           }
         }
@@ -161,9 +148,6 @@ export async function extractGcodeMetadata(file: File): Promise<GcodeMetadata> {
     }
     
     if (!metadataContent) {
-      console.log('❌ Nessun file di metadati trovato')
-      console.log('📋 Tutti i file disponibili:', fileNames)
-      
       // Restituisci un oggetto con informazioni di debug
       return {
         debug_files: fileNames.join(', '),
@@ -171,31 +155,21 @@ export async function extractGcodeMetadata(file: File): Promise<GcodeMetadata> {
       }
     }
     
-    console.log('📋 Metadati estratti da:', foundFile)
-    
     // Prova a parsare come JSON
     try {
       const parsedMetadata = JSON.parse(metadataContent)
-      console.log('✅ Metadati parsati come JSON')
       return parsedMetadata
     } catch (parseError) {
-      console.log('❌ Errore parsing JSON, provando XML...')
-      
       // Prova a parsare come XML
       if (metadataContent.trim().startsWith('<?xml') || metadataContent.trim().startsWith('<model')) {
-        console.log('✅ Parsing come XML...')
         const xmlMetadata = parseXmlMetadata(metadataContent)
         
         // Cerca informazioni aggiuntive in altri file del ZIP
-        console.log('🔍 Cercando informazioni profilo in altri file...')
         const additionalInfo = await searchForProfileInfo(zipContent, fileNames)
         
         // Combina le informazioni
         return { ...xmlMetadata, ...additionalInfo }
       }
-      
-      console.log('❌ Errore parsing XML')
-      console.log('📋 Contenuto grezzo:', metadataContent.substring(0, 500))
       
       // Se non è JSON o XML, restituiamo il contenuto grezzo
       return { 
@@ -205,7 +179,6 @@ export async function extractGcodeMetadata(file: File): Promise<GcodeMetadata> {
       }
     }
   } catch (error) {
-    console.error('❌ Errore estrazione metadati:', error)
     throw new Error(`Impossibile estrarre metadati dal file .gcode.3mf: ${error}`)
   }
 }
@@ -224,38 +197,31 @@ async function searchForProfileInfo(zipContent: JSZip, fileNames: string[]): Pro
     'Metadata/plate_1.json'
   ]
   
-  console.log('🔍 Cercando file Bambu Lab specifici...')
-  
   for (const fileName of bambuFiles) {
     try {
       const file = zipContent.file(fileName)
       if (file) {
         const content = await file.async('string')
-        console.log('📄 Analizzando file Bambu Lab:', fileName)
         
                  if (fileName.includes('project_settings.config')) {
            // Cerca informazioni del profilo nel file di configurazione principale
            const printProfileMatch = content.match(/"default_print_profile":\s*"([^"]+)"/)
            if (printProfileMatch) {
-             console.log('✅ Trovato profilo stampa:', printProfileMatch[1])
              additionalInfo.print_settings_name = printProfileMatch[1]
            }
            
            const filamentProfileMatch = content.match(/"default_filament_profile":\s*\[\s*"([^"]+)"\s*\]/)
            if (filamentProfileMatch) {
-             console.log('✅ Trovato profilo filamento:', filamentProfileMatch[1])
              additionalInfo.material_name = filamentProfileMatch[1]
            }
            
            // Cerca AUTO nel preset della stampante (printer_settings_id)
            const printerSettingsMatch = content.match(/"printer_settings_id":\s*"([^"]+)"/)
            if (printerSettingsMatch) {
-             console.log('✅ Trovato preset stampante:', printerSettingsMatch[1])
              additionalInfo.printer_settings_id = printerSettingsMatch[1]
              
              // Verifica se il preset contiene AUTO
              if (printerSettingsMatch[1].toLowerCase().includes('auto')) {
-               console.log('✅ Preset contiene AUTO')
                additionalInfo.is_automatic_profile = 'true'
              }
            }
@@ -265,7 +231,6 @@ async function searchForProfileInfo(zipContent: JSZip, fileNames: string[]): Pro
            // Cerca informazioni sui materiali
            const filamentMatch = content.match(/<filament[^>]*type="([^"]+)"[^>]*>/)
            if (filamentMatch) {
-             console.log('✅ Trovato tipo filamento:', filamentMatch[1])
              additionalInfo.material_type = filamentMatch[1]
              // Usa solo la tipologia del materiale, non il nome specifico
              additionalInfo.material_name = filamentMatch[1]
@@ -273,7 +238,6 @@ async function searchForProfileInfo(zipContent: JSZip, fileNames: string[]): Pro
            
            const printerModelMatch = content.match(/printer_model_id" value="([^"]+)"/)
            if (printerModelMatch) {
-             console.log('✅ Trovato modello stampante:', printerModelMatch[1])
              additionalInfo.printer_model = printerModelMatch[1]
            }
          }
@@ -294,8 +258,6 @@ async function searchForProfileInfo(zipContent: JSZip, fileNames: string[]): Pro
   
   // Se non troviamo nei file specifici, cerca in tutti i file
   if (!additionalInfo.print_settings_name) {
-    console.log('🔍 Cercando in tutti i file...')
-    
     for (const fileName of fileNames) {
       if (fileName.toLowerCase().includes('profile') ||
           fileName.toLowerCase().includes('config') ||
@@ -307,31 +269,27 @@ async function searchForProfileInfo(zipContent: JSZip, fileNames: string[]): Pro
           const file = zipContent.file(fileName)
           if (file) {
             const content = await file.async('string')
-            console.log('📄 Analizzando file per profilo:', fileName)
             
             // Cerca pattern comuni per profili di stampa
             const autoMatch = content.match(/AUTO/gi)
             if (autoMatch) {
-              console.log('✅ Trovato riferimento AUTO in:', fileName)
               additionalInfo.print_settings_name = 'AUTO'
             }
             
             // Cerca informazioni sui materiali
             const materialMatch = content.match(/material[:\s]+([^\n\r]+)/i)
             if (materialMatch) {
-              console.log('✅ Trovato materiale:', materialMatch[1])
               additionalInfo.material_name = materialMatch[1].trim()
             }
             
             // Cerca informazioni sul profilo
             const profileMatch = content.match(/profile[:\s]+([^\n\r]+)/i)
             if (profileMatch) {
-              console.log('✅ Trovato profilo:', profileMatch[1])
               additionalInfo.print_settings_name = profileMatch[1].trim()
             }
           }
         } catch (err) {
-          console.log('❌ Errore analisi file:', fileName, err)
+          // Ignora errori di analisi
         }
       }
     }
