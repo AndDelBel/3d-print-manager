@@ -159,7 +159,13 @@ export default function OrdersPage() {
     () => filterBySearch(
       orders,
       search,
-      [o => String(o.id), o => String(o.commessa_id)]
+      [
+        o => String(o.id), 
+        o => {
+          const file = getFileOrigine(o.gcode_id)
+          return file ? file.nome_file.split('/').pop() || file.nome_file : ''
+        }
+      ]
     ),
     [orders, search]
   )
@@ -281,19 +287,18 @@ export default function OrdersPage() {
           Aggiungi Ordine
         </Link>
       </div>
-      {statusError && <AlertMessage type="error" message={statusError} onClose={() => setStatusError(null)} />}
-      {statusSuccess && <AlertMessage type="success" message={statusSuccess} onClose={() => setStatusSuccess(null)} />}
+
       {/* Filtri */}
       <div className="mb-6">
         <div className="flex flex-wrap gap-4 items-end">
           {/* Ricerca */}
           <div className="form-control flex-1 min-w-[200px]">
             <label className="label">
-              <span className="label-text">Cerca per ID o commessa</span>
+              <span className="label-text">Cerca per ID o nome file</span>
             </label>
             <input
               type="text"
-              placeholder="Cerca per ID o commessa…"
+              placeholder="Cerca per ID o nome file…"
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="input input-bordered w-full"

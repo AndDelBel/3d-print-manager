@@ -9,32 +9,26 @@ function cleanName(str: string): string {
 }
 
 export async function listFileOrigine({ commessa_id, organizzazione_id, isSuperuser = false }: { commessa_id?: number, organizzazione_id?: number, isSuperuser?: boolean }): Promise<FileOrigine[]> {
-  let query = supabase.from('file_origine').select('*').order('data_caricamento', { ascending: false });
+  console.log('listFileOrigine chiamato con:', { commessa_id, organizzazione_id, isSuperuser });
   
-  // Se viene specificata una commessa, filtra sempre per quella commessa
-  if (commessa_id) {
+  let query = supabase
+    .from('file_origine')
+    .select('*')
+    .order('data_caricamento', { ascending: false });
+  
+  // Filtra per commessa se specificato
+  if (commessa_id !== undefined) {
     query = query.eq('commessa_id', commessa_id);
-  }
-  // Se viene specificata un'organizzazione (per non-superuser), filtra per organizzazione
-  else if (organizzazione_id && !isSuperuser) {
-    // Join con commessa per filtrare per organizzazione
-    query = supabase
-      .from('file_origine')
-      .select(`
-        *,
-        commessa!inner(organizzazione_id)
-      `)
-      .eq('commessa.organizzazione_id', organizzazione_id)
-      .order('data_caricamento', { ascending: false });
-  }
-  // Altrimenti, se non è superuser, non dovrebbe vedere nulla (per sicurezza)
-  else if (!isSuperuser) {
-    // Per utenti non superuser senza commessa o organizzazione specificata, non mostrare nulla
-    return [];
   }
   
   const { data, error } = await query;
-  if (error) throw error;
+  
+  if (error) {
+    console.error('Errore caricamento file origine:', error);
+    throw error;
+  }
+  
+  console.log('File origine caricati:', data);
   return data || [];
 }
 
@@ -138,4 +132,100 @@ export async function getFileOrigineDownloadUrl(nome_file: string): Promise<stri
     .createSignedUrl(nome_file, 60) // URL valido per 60 secondi
   if (error) throw error
   return data.signedUrl
+}
+
+export async function updateFileOrigine(
+  id: number,
+  updates: {
+    commessa_id?: number;
+    descrizione?: string | null;
+  }
+): Promise<void> {
+  const { error } = await supabase
+    .from('file_origine')
+    .update(updates)
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function replaceFileOrigine(
+  id: number,
+  newFile: File
+): Promise<void> {
+  // Recupera il file esistente
+  const { data: existingFile, error: fetchError } = await supabase
+    .from('file_origine')
+    .select('nome_file, commessa_id')
+    .eq('id', id)
+    .single()
+  if (fetchError || !existingFile) throw fetchError || new Error('File non trovato')
+
+  // Recupera nome commessa e organizzazione
+  const { data: commessa, error: commErr } = await supabase
+    .from('commessa')
+    .select('nome, organizzazione_id')
+    .eq('id', existingFile.commessa_id)
+    .single()
+  if (commErr || !commessa) throw commErr || new Error('Commessa non trovata')
+  const commessaNome = cleanName(commessa.nome)
+
+  // Recupera nome organizzazione
+  const { data: org, error: orgErr } = await supabase
+    .from('organizzazione')
+    .select('nome')
+    .eq('id', commessa.organizzazione_id)
+    .single()
+  if (orgErr || !org) throw orgErr || new Error('Organizzazione non trovata')
+  const orgNome = cleanName(org.nome)
+
+  // Clean basename
+  const originalBase = newFile.name.replace(/\.[^/.]+$/, '').replace(/\s+/g, '_').toLowerCase()
+  const ext = newFile.name.split('.').pop() || ''
+  // Path: [nome_organizzazione]/[nome_commessa]/[nomefile].[ext]
+  const storageKey = `${orgNome}/${commessaNome}/${originalBase}.${ext}`
+
+  // Elimina il file vecchio dallo storage
+  const { error: deleteError } = await supabase.storage
+    .from('files')
+    .remove([existingFile.nome_file])
+  if (deleteError) {
+    console.warn('Errore eliminazione file vecchio:', deleteError)
+    // Non blocchiamo l'operazione se non riusciamo a eliminare il file vecchio
+  }
+
+  // Upload del nuovo file
+  const { error: upErr } = await supabase.storage.from('files').upload(storageKey, newFile, { upsert: true })
+  if (upErr) throw upErr
+
+  // Aggiorna il record nel database
+  const { error: dbErr } = await supabase
+    .from('file_origine')
+    .update({
+      nome_file: storageKey,
+      tipo: ext === 'stl' ? 'stl' : 'step',
+      data_caricamento: new Date().toISOString(),
+    })
+    .eq('id', id)
+  if (dbErr) throw dbErr
+}
+
+export async function canFileBeModified(fileId: number): Promise<boolean> {
+  // Verifica se ci sono ordini con stato diverso da 'processamento'
+  const { data, error } = await supabase
+    .from('ordine')
+    .select(`
+      stato,
+      gcode!inner(file_origine_id)
+    `)
+    .eq('gcode.file_origine_id', fileId)
+    .neq('stato', 'processamento')
+    .limit(1)
+  
+  if (error) {
+    console.error('Errore verifica modificabilità file:', error)
+    return false
+  }
+  
+  // Se non ci sono ordini con stato diverso da 'processamento', il file può essere modificato
+  return data.length === 0
 } 

@@ -282,6 +282,7 @@ export default function FilesPage() {
   const righe: RigaFile[] = files.map(f => {
     const { organizzazione, commessa } = getOrgCommFromFile(f, commesse, orgs)
     const gcodeList = gcodeMap.get(f.id)
+    const comm = commesse.find(c => c.id === f.commessa_id)
     return {
       id: f.id,
       nome: f.nome_file.split('/').pop() || f.nome_file,
@@ -289,6 +290,8 @@ export default function FilesPage() {
       commessa,
       descrizione: f.descrizione,
       nomeGcode: gcodeList && gcodeList.length > 0 ? gcodeList[0].nome_file.split('/').pop() : undefined,
+      organizzazione_id: comm?.organizzazione_id,
+      commessa_id: f.commessa_id,
     }
   })
 

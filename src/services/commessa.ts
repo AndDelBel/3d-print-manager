@@ -2,20 +2,26 @@ import { supabase } from '@/lib/supabaseClient'
 import type { Commessa } from '@/types/commessa'
 
 export async function listCommesse({ organizzazione_id, isSuperuser = false }: { organizzazione_id?: number, isSuperuser?: boolean }): Promise<Commessa[]> {
-  let query = supabase.from('commessa').select('*').order('created_at', { ascending: false });
+  console.log('listCommesse chiamato con:', { organizzazione_id, isSuperuser });
   
-  // Se viene specificata un'organizzazione, filtra sempre per quella organizzazione
-  if (organizzazione_id) {
+  let query = supabase
+    .from('commessa')
+    .select('*')
+    .order('created_at', { ascending: false });
+  
+  // Filtra per organizzazione se specificato
+  if (organizzazione_id !== undefined) {
     query = query.eq('organizzazione_id', organizzazione_id);
-  }
-  // Altrimenti, se non è superuser, non dovrebbe vedere nulla (per sicurezza)
-  else if (!isSuperuser) {
-    // Per utenti non superuser senza organizzazione specificata, non mostrare nulla
-    return [];
   }
   
   const { data, error } = await query;
-  if (error) throw error;
+  
+  if (error) {
+    console.error('Errore caricamento commesse:', error);
+    throw error;
+  }
+  
+  console.log('Commesse caricate:', data);
   return data || [];
 }
 

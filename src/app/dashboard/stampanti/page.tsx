@@ -11,26 +11,29 @@ import { StampanteCard } from '@/components/StampanteCard'
 import { StampanteModal } from '@/components/StampanteModal'
 
 export default function StampantiPage() {
-  const { loading } = useUser()
+  const { loading, user } = useUser()
   const [stampanti, setStampanti] = useState<Stampante[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loadingStampanti, setLoadingStampanti] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedStampante, setSelectedStampante] = useState<Stampante | null>(null)
 
+  const isSuperuser = user?.is_superuser
+
   useEffect(() => {
-    if (!loading) {
+    if (!loading && user) {
       setLoadingStampanti(true)
-      listStampanti()
+      listStampanti({ userId: user.id, isSuperuser })
         .then(setStampanti)
         .catch(() => setError('Errore caricamento stampanti'))
         .finally(() => setLoadingStampanti(false))
     }
-  }, [loading])
+  }, [loading, user, isSuperuser])
 
   const handleRefresh = () => {
+    if (!user) return;
     setLoadingStampanti(true)
-    listStampanti()
+    listStampanti({ userId: user.id, isSuperuser })
       .then(setStampanti)
       .catch(() => setError('Errore caricamento stampanti'))
       .finally(() => setLoadingStampanti(false))
@@ -117,7 +120,7 @@ export default function StampantiPage() {
               onRefresh={handleRefresh}
               onEdit={handleOpenModal}
               onDelete={handleDeleteStampante}
-              isSuperuser={true}
+              isSuperuser={isSuperuser}
             />
           ))}
         </div>

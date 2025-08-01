@@ -28,24 +28,26 @@ export default function UploadPage() {
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
 
+  const isSuperuser = user?.is_superuser
+
   // Carica organizzazioni
   useEffect(() => {
     if (!loading && user) {
-      listOrg({ userId: user.id, isSuperuser: user.is_superuser }).then(setOrgs).catch(console.error)
+      listOrg({ userId: user.id, isSuperuser }).then(setOrgs).catch(console.error)
     }
-  }, [loading, user])
+  }, [loading, user, isSuperuser])
 
   // Seleziona automaticamente l'organizzazione se l'utente non è superuser e ha una sola organizzazione
   useEffect(() => {
-    if (!user?.is_superuser && orgs.length === 1 && !orgId) {
+    if (!isSuperuser && orgs.length === 1 && !orgId) {
       setOrgId(orgs[0].id)
     }
-  }, [user?.is_superuser, orgs, orgId])
+  }, [isSuperuser, orgs, orgId])
 
   // Carica commesse per organizzazione
   useEffect(() => {
     if (orgId !== undefined) {
-      listCommesse({ organizzazione_id: orgId, isSuperuser: user?.is_superuser }).then(commesse => {
+      listCommesse({ organizzazione_id: orgId, isSuperuser }).then(commesse => {
         setCommesse(commesse)
       }).catch(err => {
         console.error('Errore caricamento commesse:', err)
@@ -60,7 +62,7 @@ export default function UploadPage() {
       setIsNew(false)
       setNewComm('')
     }
-  }, [orgId, user])
+  }, [orgId, isSuperuser])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -76,7 +78,7 @@ export default function UploadPage() {
       setSaving(true)
       try {
         await createCommessa(newCommessa.trim(), orgId)
-        const commesseAgg = await listCommesse({ organizzazione_id: orgId, isSuperuser: user?.is_superuser })
+        const commesseAgg = await listCommesse({ organizzazione_id: orgId, isSuperuser })
         setCommesse(commesseAgg)
         finalCommessaId = commesseAgg.find(c => c.nome === newCommessa.trim())?.id
         setCommessaId(finalCommessaId)
@@ -120,8 +122,8 @@ export default function UploadPage() {
       {error && <AlertMessage type="error" message={error} onClose={() => setError(null)} />}
       {success && <AlertMessage type="success" message={success} onClose={() => setSuccess(null)} />}
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Organizzazione */}
-        {(user?.is_superuser || orgs.length > 1) && (
+        {/* Organizzazione - solo per superuser o se ci sono più organizzazioni */}
+        {(isSuperuser || orgs.length > 1) && (
           <div className="form-control">
             <label className="label">
               <span className="label-text">Organizzazione</span>
@@ -139,7 +141,7 @@ export default function UploadPage() {
         )}
         
         {/* Messaggio informativo per utenti con una sola organizzazione */}
-        {!user?.is_superuser && orgs.length === 1 && orgId && (
+        {!isSuperuser && orgs.length === 1 && orgId && (
           <div className="alert alert-info">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" className="stroke-current shrink-0 w-6 h-6">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -148,15 +150,8 @@ export default function UploadPage() {
           </div>
         )}
         
-        {/* Messaggio quando non ci sono commesse disponibili */}
-        {orgId && commesse.length === 0 && (
-          <div className="alert alert-warning">
-            <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-            <span>Nessuna commessa disponibile per questa organizzazione. Crea una nuova commessa per procedere.</span>
-          </div>
-        )}
+
+
         {/* Commessa: esistente o nuova */}
         <div className="form-control">
           <label className="label">
@@ -168,7 +163,7 @@ export default function UploadPage() {
                 className="select select-bordered flex-1"
                 value={commessaId ?? ''}
                 onChange={e => setCommessaId(Number(e.target.value) || undefined)}
-                disabled={saving || orgId === undefined || commesse.length === 0}
+                disabled={saving || orgId === undefined}
               >
                 <option value="">Seleziona...</option>
                 {commesse.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
@@ -203,6 +198,7 @@ export default function UploadPage() {
             </div>
           )}
         </div>
+
         {/* Descrizione */}
         <div className="form-control">
           <label className="label">
@@ -215,6 +211,7 @@ export default function UploadPage() {
             disabled={saving}
           />
         </div>
+
         {/* File input */}
         <div className="form-control">
           <label className="label">
@@ -228,6 +225,7 @@ export default function UploadPage() {
             className="file-input file-input-bordered w-full"
           />
         </div>
+
         <LoadingButton
           type="submit"
           loading={saving}

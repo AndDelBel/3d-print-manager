@@ -1,13 +1,24 @@
 import { supabase } from '@/lib/supabaseClient'
 import type { Ordine } from '@/types/ordine'
+import { addToCodaStampa, updateCodaStampaStatus } from './codaStampa'
 
 export async function listOrders({ organizzazione_id, isSuperuser = false }: { organizzazione_id?: number, isSuperuser?: boolean } = {}): Promise<Ordine[]> {
-  let query = supabase.from('ordine').select('*').order('data_ordine', { ascending: false });
-  if (!isSuperuser && organizzazione_id) {
-    query = query.eq('organizzazione_id', organizzazione_id);
+  console.log('listOrders chiamato con:', { organizzazione_id, isSuperuser });
+  
+  // Le RLS policies gestiscono automaticamente l'accesso basato su organizzazione
+  // Per superuser: vede tutti gli ordini
+  // Per utenti normali: vede solo gli ordini della propria organizzazione
+  const { data, error } = await supabase
+    .from('ordine')
+    .select('*')
+    .order('data_ordine', { ascending: false });
+  
+  if (error) {
+    console.error('Errore caricamento ordini:', error);
+    throw error;
   }
-  const { data, error } = await query;
-  if (error) throw error;
+  
+  console.log('Ordini caricati:', data);
   return data || [];
 }
 
@@ -115,11 +126,73 @@ export async function updateOrderStatus(
   id: number,
   stato: Ordine['stato']
 ): Promise<void> {
+  // Prima aggiorna lo stato dell'ordine
   const { error } = await supabase
     .from('ordine')
     .update({ stato })
     .eq('id', id)
   if (error) throw error
+
+  // Se lo stato è diverso da 'processamento', gestisci la coda di stampa
+  if (stato !== 'processamento') {
+    try {
+      // Recupera l'ordine per ottenere informazioni necessarie
+      const { data: ordine, error: ordineError } = await supabase
+        .from('ordine')
+        .select('*')
+        .eq('id', id)
+        .single()
+      
+      if (ordineError) throw ordineError
+
+      // Verifica se l'ordine è già nella coda di stampa
+      const { data: existingCoda, error: codaError } = await supabase
+        .from('coda_stampa')
+        .select('*')
+        .eq('ordine_id', id)
+        .single()
+
+      if (codaError && codaError.code !== 'PGRST116') throw codaError // PGRST116 = no rows returned
+
+      if (!existingCoda) {
+        // L'ordine non è nella coda, aggiungilo
+        // Per ora usa la prima stampante disponibile (in futuro si può implementare logica più sofisticata)
+        const { data: stampanti, error: stampantiError } = await supabase
+          .from('stampante')
+          .select('id')
+          .eq('attiva', true)
+          .limit(1)
+        
+        if (stampantiError) throw stampantiError
+        
+        if (stampanti && stampanti.length > 0) {
+          await addToCodaStampa(id, stampanti[0].id)
+        }
+      } else {
+        // L'ordine è già nella coda, aggiorna lo stato
+        const codaStato = mapOrderStatusToCodaStatus(stato)
+        await updateCodaStampaStatus(existingCoda.id, codaStato)
+      }
+    } catch (err) {
+      console.error('Errore gestione coda stampa:', err)
+      // Non bloccare l'aggiornamento dell'ordine se la coda fallisce
+    }
+  }
+}
+
+// Funzione per mappare gli stati dell'ordine agli stati della coda di stampa
+function mapOrderStatusToCodaStatus(ordineStato: Ordine['stato']): 'in_queue' | 'printing' | 'done' | 'error' {
+  switch (ordineStato) {
+    case 'in_coda':
+      return 'in_queue'
+    case 'in_stampa':
+      return 'printing'
+    case 'pronto':
+    case 'consegnato':
+      return 'done'
+    default:
+      return 'in_queue'
+  }
 }
 
 export async function updateOrderGcode(

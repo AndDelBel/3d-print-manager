@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { listOrdersByFileOrigine } from '@/services/ordine'
 import { listGcode, getGcodeDownloadUrl, uploadGcode, deleteGcode } from '@/services/gcode'
-import { listFileOrigineByIds, setGcodePrincipale, getGcodePrincipale, getFileOrigineDownloadUrl } from '@/services/fileOrigine'
+import { listFileOrigineByIds, setGcodePrincipale, getGcodePrincipale, getFileOrigineDownloadUrl, canFileBeModified } from '@/services/fileOrigine'
 import { listCommesse } from '@/services/commessa'
 import { listOrg } from '@/services/organizzazione'
 import { getUtentiByIds } from '@/services/utente'
@@ -16,6 +16,7 @@ import type { Organizzazione } from '@/types/organizzazione'
 import type { Utente } from '@/types/utente'
 import { AlertMessage } from '@/components/AlertMessage'
 import { ConfirmModal } from '@/components/ConfirmModal'
+import { FileEditModal } from '@/components/FileEditModal'
 import { updateOrderGcode } from '@/services/ordine'
 
 export default function FileDetailPage() {
@@ -35,6 +36,8 @@ export default function FileDetailPage() {
   const [editingGcodeOrderId, setEditingGcodeOrderId] = useState<number | null>(null)
   const [inlineGcodeValue, setInlineGcodeValue] = useState<number | undefined>(undefined)
   const [inlineGcodeLoading, setInlineGcodeLoading] = useState(false)
+  const [canEdit, setCanEdit] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
 
   const isSuperuser = user?.is_superuser
 
@@ -71,6 +74,12 @@ export default function FileDetailPage() {
       // Carica G-code principale
       getGcodePrincipale(file.id).then(setMainGcodeId).catch(err => {
         console.error('Errore caricamento G-code principale:', err)
+      })
+
+      // Verifica se il file può essere modificato
+      canFileBeModified(file.id).then(setCanEdit).catch(err => {
+        console.error('Errore verifica modificabilità file:', err)
+        setCanEdit(false)
       })
     }
   }, [file])
@@ -196,6 +205,24 @@ export default function FileDetailPage() {
     }
   }
 
+  const handleEditSuccess = async () => {
+    // Ricarica i dati del file
+    if (id) {
+      try {
+        const updatedFiles = await listFileOrigineByIds([Number(id)])
+        setFile(updatedFiles[0] || null)
+        
+        // Ricarica anche commessa e organizzazione
+        if (updatedFiles[0]) {
+          const commesse = await listCommesse({ isSuperuser: true })
+          setCommessa(commesse.find(c => c.id === updatedFiles[0].commessa_id) || null)
+        }
+      } catch (err) {
+        console.error('Errore ricaricamento file:', err)
+      }
+    }
+  }
+
   const getUtenteName = (userId: string) => {
     const utente = utenti.get(userId)
     return utente ? `${utente.nome} ${utente.cognome}` : `Utente ${userId.slice(0, 8)}`
@@ -220,7 +247,41 @@ export default function FileDetailPage() {
           {/* Informazioni file */}
           <div className="card bg-base-200 mb-6">
             <div className="card-body">
-              <h2 className="card-title">Informazioni File</h2>
+              <div className="flex justify-between items-start mb-4">
+                <h2 className="card-title">Informazioni File</h2>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleDownloadStl}
+                    className="btn btn-primary btn-sm"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Scarica STL
+                  </button>
+                  {canEdit && (
+                    <button
+                      onClick={() => setEditModalOpen(true)}
+                      className="btn btn-secondary btn-sm"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      Modifica
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              {!canEdit && (
+                <div className="alert alert-warning mb-4">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <span>Il file non può essere modificato perché ha ordini associati con stato diverso da &quot;processamento&quot;</span>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div><b>Nome file:</b> {file.nome_file.split('/').pop() || file.nome_file}</div>
                 <div><b>Commessa:</b> {commessa ? commessa.nome : file.commessa_id}</div>
@@ -234,17 +295,6 @@ export default function FileDetailPage() {
                     </div>
                   </div>
                 )}
-              </div>
-              <div className="mt-4 flex justify-end">
-                <button
-                  onClick={handleDownloadStl}
-                  className="btn btn-primary"
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Scarica File STL
-                </button>
               </div>
             </div>
           </div>
@@ -343,79 +393,78 @@ export default function FileDetailPage() {
             )}
           </div>
 
-
-            {/* G-code associati */}
-            {isSuperuser && (
-              <div className="mb-6">
-                <h2 className="text-lg font-semibold mb-3">G-code associati ({gcodes.length})</h2>
-                {gcodes.length === 0 ? (
-                  <p className="text-base-content/70">Nessun G-code associato a questo file.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {gcodes.map(g => (
-                      <div key={g.id} className="card bg-base-200 hover:bg-base-300 transition-colors">
-                        <div className="card-body">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3">
-                                <span className="font-medium">{g.nome_file.split('/').pop() || g.nome_file}</span>
-                                {mainGcodeId === g.id && (
-                                  <span className="badge badge-success">
-                                    Principale
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-sm text-base-content/70 mt-1">
-                                Caricato il {new Date(g.data_caricamento).toLocaleDateString()}
-                              </div>
+          {/* G-code associati */}
+          {isSuperuser && (
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold mb-3">G-code associati ({gcodes.length})</h2>
+              {gcodes.length === 0 ? (
+                <p className="text-base-content/70">Nessun G-code associato a questo file.</p>
+              ) : (
+                <div className="space-y-3">
+                  {gcodes.map(g => (
+                    <div key={g.id} className="card bg-base-200 hover:bg-base-300 transition-colors">
+                      <div className="card-body">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3">
+                              <span className="font-medium">{g.nome_file.split('/').pop() || g.nome_file}</span>
+                              {mainGcodeId === g.id && (
+                                <span className="badge badge-success">
+                                  Principale
+                                </span>
+                              )}
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="text-sm text-base-content/70 mt-1">
+                              Caricato il {new Date(g.data_caricamento).toLocaleDateString()}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleDownload(g)}
+                              className="btn btn-primary btn-sm"
+                            >
+                              Scarica
+                            </button>
+                            {isSuperuser && mainGcodeId !== g.id && (
                               <button
-                                onClick={() => handleDownload(g)}
-                                className="btn btn-primary btn-sm"
+                                onClick={() => handleSetMainGcode(g.id)}
+                                className="btn btn-success btn-sm"
                               >
-                                Scarica
+                                Imposta principale
                               </button>
-                              {isSuperuser && mainGcodeId !== g.id && (
-                                <button
-                                  onClick={() => handleSetMainGcode(g.id)}
-                                  className="btn btn-success btn-sm"
-                                >
-                                  Imposta principale
-                                </button>
-                              )}
-                              {isSuperuser && gcodes.length > 1 && (
-                                <button
-                                  onClick={() => setDeleteGcodeTarget(g)}
-                                  className="btn btn-error btn-sm"
-                                >
-                                  Elimina
-                                </button>
-                              )}
-                            </div>
+                            )}
+                            {isSuperuser && gcodes.length > 1 && (
+                              <button
+                                onClick={() => setDeleteGcodeTarget(g)}
+                                className="btn btn-error btn-sm"
+                              >
+                                Elimina
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-                <div className="mt-4 card bg-base-200 border-dashed">
-                  <div className="card-body">
-                    <label className="label">
-                      <span className="label-text font-medium">Aggiungi nuovo G-code</span>
-                    </label>
-                    <input 
-                      type="file" 
-                      accept=".gcode,.3mf" 
-                      onChange={handleUpload} 
-                      disabled={uploading}
-                      className="file-input file-input-bordered w-full"
-                    />
-                    {uploading && <p className="text-sm text-base-content/70 mt-2">Caricamento in corso...</p>}
-                  </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="mt-4 card bg-base-200 border-dashed">
+                <div className="card-body">
+                  <label className="label">
+                    <span className="label-text font-medium">Aggiungi nuovo G-code</span>
+                  </label>
+                  <input 
+                    type="file" 
+                    accept=".gcode,.3mf" 
+                    onChange={handleUpload} 
+                    disabled={uploading}
+                    className="file-input file-input-bordered w-full"
+                  />
+                  {uploading && <p className="text-sm text-base-content/70 mt-2">Caricamento in corso...</p>}
                 </div>
               </div>
-            )}
+            </div>
+          )}
         </>
       ) : (
         <p>Caricamento file…</p>
@@ -429,6 +478,14 @@ export default function FileDetailPage() {
         cancelText="Annulla"
         onConfirm={handleDeleteGcode}
         onCancel={() => setDeleteGcodeTarget(null)}
+      />
+
+      <FileEditModal
+        file={file}
+        isOpen={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        onSuccess={handleEditSuccess}
+        isSuperuser={isSuperuser || false}
       />
     </div>
   )

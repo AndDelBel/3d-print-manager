@@ -1,13 +1,23 @@
 import { supabase } from '@/lib/supabaseClient'
 import type { Stampante, StampanteStatus } from '@/types/stampante'
 
-export async function listStampanti(): Promise<Stampante[]> {
+export async function listStampanti({ userId, isSuperuser = false }: { userId?: string, isSuperuser?: boolean } = {}): Promise<Stampante[]> {
+  console.log('listStampanti chiamato con:', { userId, isSuperuser });
+  
+  // Le RLS policies gestiscono automaticamente l'accesso basato su organizzazione
+  // Per superuser: vede tutte le stampanti
+  // Per utenti normali: vede solo le stampanti della propria organizzazione
   const { data, error } = await supabase
     .from('stampante')
     .select('*')
     .order('id', { ascending: false });
   
-  if (error) throw error;
+  if (error) {
+    console.error('Errore caricamento stampanti:', error);
+    throw error;
+  }
+  
+  console.log('Stampanti caricate:', data);
   return data || [];
 }
 

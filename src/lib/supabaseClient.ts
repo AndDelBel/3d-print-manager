@@ -12,5 +12,23 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true
+  },
+  // Configurazione per evitare errori 404
+  global: {
+    headers: {
+      'X-Client-Info': 'supabase-js/2.x'
+    }
   }
 })
+
+// Client per operazioni server-side
+export const supabaseAdmin = createClient(
+  supabaseUrl,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseKey,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
+)

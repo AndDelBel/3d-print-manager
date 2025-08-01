@@ -2,18 +2,37 @@ import { supabase } from '@/lib/supabaseClient'
 import type { Organizzazione } from '@/types/organizzazione'
 
 export async function listOrg({ userId, isSuperuser = false }: { userId?: string, isSuperuser?: boolean } = {}): Promise<Organizzazione[]> {
+  // Per superuser, carica tutte le organizzazioni
   if (isSuperuser) {
     const { data, error } = await supabase.from('organizzazione').select('*');
     if (error) throw error;
     return data || [];
   }
+  
+  // Per utenti normali, carica solo le organizzazioni a cui appartengono
   if (!userId) throw new Error('userId richiesto per utenti non superuser');
-  const { data: orgs, error } = await supabase
+  
+  // Prima ottieni gli ID delle organizzazioni dell'utente
+  const { data: userOrgs, error: userOrgsError } = await supabase
     .from('organizzazioni_utente')
-    .select('organizzazione(id,nome,created_at)')
-    .eq('user_id', userId)
-  if (error) throw error
-  return orgs.map(row => row.organizzazione).flat();
+    .select('organizzazione_id')
+    .eq('user_id', userId);
+  
+  if (userOrgsError) throw userOrgsError;
+  
+  if (!userOrgs || userOrgs.length === 0) {
+    return [];
+  }
+  
+  // Poi carica le organizzazioni
+  const orgIds = userOrgs.map(org => org.organizzazione_id);
+  const { data, error } = await supabase
+    .from('organizzazione')
+    .select('*')
+    .in('id', orgIds);
+  
+  if (error) throw error;
+  return data || [];
 }
 
 export async function createOrg(nome: string): Promise<void> {
