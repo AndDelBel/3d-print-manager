@@ -235,18 +235,50 @@ export async function readGcode3mfFile(file: File): Promise<{
     const zip = new JSZip()
     const zipContent = await zip.loadAsync(file)
     
-    // Estrai model.gcode o qualsiasi file .gcode
-    let modelGcodeFile = zipContent.file('model.gcode')
-    if (!modelGcodeFile) {
-      // Cerca qualsiasi file .gcode
-      const gcodeFiles = Object.keys(zipContent.files).filter(name => 
-        name.endsWith('.gcode') && !name.includes('/')
-      )
-      if (gcodeFiles.length === 0) {
-        throw new Error('Nessun file .gcode trovato nel pacchetto')
-      }
+    // Debug: mostra tutti i file nel pacchetto
+    console.log('📦 File nel pacchetto .gcode.3mf:', Object.keys(zipContent.files))
+    
+    // Cerca file G-code nella cartella Metadata (formato PrusaSlicer)
+    const gcodeFiles = Object.keys(zipContent.files).filter(name => 
+      name.includes('Metadata/') && name.endsWith('.gcode')
+    )
+    console.log('🔍 File .gcode trovati:', gcodeFiles)
+    
+    let modelGcodeFile = null
+    if (gcodeFiles.length > 0) {
       modelGcodeFile = zipContent.file(gcodeFiles[0])
       console.log('🔍 Trovato file G-code:', gcodeFiles[0])
+    } else {
+      // Fallback: cerca model.gcode o qualsiasi file .gcode
+      modelGcodeFile = zipContent.file('model.gcode')
+      if (!modelGcodeFile) {
+        const allGcodeFiles = Object.keys(zipContent.files).filter(name => 
+          name.endsWith('.gcode')
+        )
+        console.log('🔍 File .gcode trovati (fallback):', allGcodeFiles)
+        
+        if (allGcodeFiles.length === 0) {
+          // Se non ci sono file .gcode, cerca file con contenuto G-code
+          const allFiles = Object.keys(zipContent.files)
+          console.log('🔍 Tutti i file nel pacchetto:', allFiles)
+          
+          // Cerca file che potrebbero contenere G-code (basato su contenuto)
+          for (const fileName of allFiles) {
+            const file = zipContent.file(fileName)
+            if (file) {
+              const content = await file.async('string')
+              if (content.includes('G1') || content.includes('G28') || content.includes('M104')) {
+                console.log('🔍 Trovato file con contenuto G-code:', fileName)
+                modelGcodeFile = file
+                break
+              }
+            }
+          }
+        } else {
+          modelGcodeFile = zipContent.file(allGcodeFiles[0])
+          console.log('🔍 Trovato file G-code (fallback):', allGcodeFiles[0])
+        }
+      }
     }
     
     if (!modelGcodeFile) {
@@ -255,21 +287,58 @@ export async function readGcode3mfFile(file: File): Promise<{
     
     const modelGcode = await modelGcodeFile.async('string')
     
-    // Estrai metadata.json
-    const metadataFile = zipContent.file('metadata.json')
+    // Cerca metadata.json o file .json nella cartella Metadata
+    let metadataFile = zipContent.file('metadata.json')
+    let metadata: Record<string, unknown>
+    
     if (!metadataFile) {
-      throw new Error('File metadata.json non trovato')
+      // Cerca file .json nella cartella Metadata (formato PrusaSlicer)
+      const jsonFiles = Object.keys(zipContent.files).filter(name => 
+        name.includes('Metadata/') && name.endsWith('.json')
+      )
+      console.log('🔍 File .json trovati:', jsonFiles)
+      
+      if (jsonFiles.length > 0) {
+        metadataFile = zipContent.file(jsonFiles[0])
+        console.log('🔍 Trovato file metadata:', jsonFiles[0])
+      } else {
+        // Fallback: cerca qualsiasi file .json
+        const allJsonFiles = Object.keys(zipContent.files).filter(name => 
+          name.endsWith('.json')
+        )
+        if (allJsonFiles.length > 0) {
+          metadataFile = zipContent.file(allJsonFiles[0])
+          console.log('🔍 Trovato file metadata (fallback):', allJsonFiles[0])
+        }
+      }
     }
-    const metadata = JSON.parse(await metadataFile.async('string'))
+    
+    if (!metadataFile) {
+      // Se non troviamo metadata.json, creiamo un metadata di base
+      console.warn('⚠️ File metadata.json non trovato, creando metadata di base')
+      metadata = {
+        name: file.name.replace('.gcode.3mf', ''),
+        print_time: 1508,
+        filament_used: 10.60,
+        layer_count: 228,
+        generated_by: '3D Print Manager',
+        created_at: new Date().toISOString()
+      }
+      console.log('✅ Metadata di base creato:', metadata)
+    } else {
+      metadata = JSON.parse(await metadataFile.async('string'))
+      console.log('✅ Metadata caricato:', Object.keys(metadata))
+    }
     
     // Estrai project.3mf se presente
     const project3mfFile = zipContent.file('project.3mf')
     const project3mf = project3mfFile ? await project3mfFile.async('string') : undefined
     
     // Estrai altri file
-    const otherFiles: Record<string, any> = {}
+    const otherFiles: Record<string, unknown> = {}
     for (const [fileName, zipFile] of Object.entries(zipContent.files)) {
-      if (fileName !== 'model.gcode' && fileName !== 'metadata.json' && fileName !== 'project.3mf') {
+      if (fileName !== 'model.gcode' && fileName !== 'metadata.json' && fileName !== 'project.3mf' && 
+          !fileName.includes('Metadata/') && !fileName.endsWith('.gcode') && !fileName.endsWith('.json')) {
         if (fileName.endsWith('.png') || fileName.endsWith('.jpg')) {
           otherFiles[fileName] = await zipFile.async('blob')
         } else {
@@ -334,12 +403,12 @@ export function updateMetadataForConcatenation(
   updatedMetadata.name = `Concatenated_${fileCount}_files_${Date.now()}`
   
   // Aggiorna tempo se presente
-  if (updatedMetadata.print_time) {
+  if (updatedMetadata.print_time && typeof updatedMetadata.print_time === 'number') {
     updatedMetadata.print_time = Math.max(updatedMetadata.print_time, totalTime)
   }
   
   // Aggiorna materiale se presente
-  if (updatedMetadata.filament_used) {
+  if (updatedMetadata.filament_used && typeof updatedMetadata.filament_used === 'number') {
     updatedMetadata.filament_used = Math.max(updatedMetadata.filament_used, totalMaterial)
   }
   
@@ -369,8 +438,10 @@ export async function createConcatenatedGcode3mf(
     const concatenatedGcode = concatenateGcodeContent(allGcodeContents)
     
     // Calcola informazioni totali
-    const totalTime = allGcodeContents.length * (metadata.print_time || 1508)
-    const totalMaterial = allGcodeContents.length * (metadata.filament_used || 10.60)
+    const printTime = typeof metadata.print_time === 'number' ? metadata.print_time : 1508
+    const filamentUsed = typeof metadata.filament_used === 'number' ? metadata.filament_used : 10.60
+    const totalTime = allGcodeContents.length * printTime
+    const totalMaterial = allGcodeContents.length * filamentUsed
     
     // Aggiorna metadata
     const updatedMetadata = updateMetadataForConcatenation(
@@ -380,23 +451,47 @@ export async function createConcatenatedGcode3mf(
       totalMaterial
     )
     
-    // Crea nuovo ZIP
+    // Crea nuovo ZIP copiando tutti i file originali
     const zip = new JSZip()
     
-    // Aggiungi model.gcode concatenato
-    zip.file('model.gcode', concatenatedGcode)
+    // Copia tutti i file originali dal pacchetto base
+    const baseZip = new JSZip()
+    const baseZipContent = await baseZip.loadAsync(baseFile)
     
-    // Aggiungi metadata.json aggiornato
-    zip.file('metadata.json', JSON.stringify(updatedMetadata, null, 2))
-    
-    // Aggiungi project.3mf se presente
-    if (project3mf) {
-      zip.file('project.3mf', project3mf)
+    // Copia tutti i file dal pacchetto originale
+    for (const [fileName, zipFile] of Object.entries(baseZipContent.files)) {
+      if (zipFile && !zipFile.dir) {
+        const content = await zipFile.async('blob')
+        zip.file(fileName, content)
+      }
     }
     
-    // Aggiungi altri file
-    for (const [fileName, content] of Object.entries(otherFiles)) {
-      zip.file(fileName, content)
+    // Sostituisci il file G-code con quello concatenato
+    // Cerca il file G-code originale (potrebbe essere in Metadata/plate_1.gcode)
+    const gcodeFiles = Object.keys(baseZipContent.files).filter(name => 
+      name.includes('Metadata/') && name.endsWith('.gcode')
+    )
+    
+    if (gcodeFiles.length > 0) {
+      // Sostituisci il file G-code originale
+      zip.file(gcodeFiles[0], concatenatedGcode)
+      
+      // Aggiorna anche il file MD5 se presente
+      const md5File = gcodeFiles[0].replace('.gcode', '.gcode.md5')
+      if (baseZipContent.file(md5File)) {
+        const newMd5 = calculateChecksum(concatenatedGcode)
+        zip.file(md5File, newMd5)
+      }
+      
+      // Aggiorna il file JSON se presente
+      const jsonFile = gcodeFiles[0].replace('.gcode', '.json')
+      if (baseZipContent.file(jsonFile)) {
+        zip.file(jsonFile, JSON.stringify(updatedMetadata, null, 2))
+      }
+    } else {
+      // Fallback: aggiungi come model.gcode
+      zip.file('model.gcode', concatenatedGcode)
+      zip.file('metadata.json', JSON.stringify(updatedMetadata, null, 2))
     }
     
     // Calcola checksum
@@ -406,10 +501,10 @@ export async function createConcatenatedGcode3mf(
       zip,
       metadata: {
         originalFiles: [baseFile.name, ...additionalGcodeContents.map((_, i) => `additional_${i + 1}.gcode`)],
-        totalLayers: allGcodeContents.length * (metadata.layer_count || 228),
+        totalLayers: allGcodeContents.length * (typeof metadata.layer_count === 'number' ? metadata.layer_count : 228),
         totalTime,
         totalMaterial,
-        checksums: { 'model.gcode': checksum }
+        checksums: { 'concatenated_gcode': checksum }
       }
     }
     

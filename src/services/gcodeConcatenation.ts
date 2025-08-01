@@ -235,51 +235,39 @@ export async function executeConcatenation(
     console.log('🔗 Eseguendo concatenazione per:', candidate)
     console.log('📁 File di output:', outputFileName)
     
-    // Recupera i file G-code originali
-    const gcodeFiles: Array<{ name: string; content: string }> = []
+    // Recupera i dati degli ordini per ottenere le quantità
+    const { data: ordiniData, error: ordiniError } = await supabase
+      .from('ordine')
+      .select('id, gcode_id, quantita')
+      .in('id', candidate.ordineIds)
     
-    for (const gcodeId of candidate.gcodeIds) {
-      try {
-        // Recupera il file G-code da Supabase Storage
-        const { data: gcodeData, error: gcodeError } = await supabase.storage
-          .from('gcode')
-          .download(`gcode_${gcodeId}.gcode`)
-        
-        if (gcodeError) {
-          console.warn('⚠️ File G-code non trovato:', gcodeId)
-          // Crea un file placeholder per test
-          gcodeFiles.push({
-            name: `gcode_${gcodeId}.gcode`,
-            content: `; Placeholder G-code file ${gcodeId}\n; Generated for testing\nG28\nG1 Z10 F300\n`
-          })
-        } else {
-          const content = await gcodeData.text()
-          gcodeFiles.push({
-            name: `gcode_${gcodeId}.gcode`,
-            content
-          })
-        }
-      } catch (err) {
-        console.error('❌ Errore recupero file G-code:', gcodeId, err)
-        // Crea un file placeholder per test
-        gcodeFiles.push({
-          name: `gcode_${gcodeId}.gcode`,
-          content: `; Placeholder G-code file ${gcodeId}\n; Generated for testing\nG28\nG1 Z10 F300\n`
-        })
-      }
+    if (ordiniError) {
+      throw new Error(`Errore recupero dati ordini: ${ordiniError.message}`)
     }
+    
+    if (!ordiniData || ordiniData.length === 0) {
+      throw new Error('Nessun dato ordine trovato')
+    }
+    
+    console.log('📄 Dati ordini trovati:', ordiniData)
+    
+    // Crea una mappa delle quantità per ogni G-code
+    const gcodeQuantities = new Map<number, number>()
+    for (const ordine of ordiniData) {
+      const currentQuantity = gcodeQuantities.get(ordine.gcode_id) || 0
+      gcodeQuantities.set(ordine.gcode_id, currentQuantity + ordine.quantita)
+    }
+    
+    console.log('📦 Quantità per G-code:', Object.fromEntries(gcodeQuantities))
     
     // Recupera i file .gcode.3mf reali associati agli ordini
     console.log('🔍 Recuperando file .gcode.3mf reali...')
     
     try {
-      // Recupera i file .gcode.3mf dai percorsi degli ordini
-      const gcode3mfFiles: File[] = []
-      
-      // Prima recupera i dati dei G-code per ottenere i percorsi completi
+      // Recupera i dati dei G-code per ottenere i percorsi completi
       const { data: gcodeData, error: gcodeError } = await supabase
         .from('gcode')
-        .select('id, nome_file, file_origine_id')
+        .select('id, nome_file')
         .in('id', candidate.gcodeIds)
       
       if (gcodeError) {
@@ -292,61 +280,16 @@ export async function executeConcatenation(
       
       console.log('📄 Dati G-code trovati:', gcodeData)
       
-      // Recupera anche i dati dei file_origine per costruire i percorsi completi
-      const fileOrigineIds = gcodeData.map(g => g.file_origine_id)
-      const { data: fileOrigineData, error: fileOrigineError } = await supabase
-        .from('file_origine')
-        .select('id, nome_file, commessa_id')
-        .in('id', fileOrigineIds)
+      // Recupera i file .gcode.3mf e crea le liste di contenuti replicati
+      const allGcodeContents: string[] = []
+      let baseFile: File | null = null
       
-      if (fileOrigineError) {
-        throw new Error(`Errore recupero dati file_origine: ${fileOrigineError.message}`)
-      }
-      
-      // Recupera i dati delle commesse per ottenere il nome dell'organizzazione
-      const commessaIds = fileOrigineData?.map(f => f.commessa_id) || []
-      const { data: commessaData, error: commessaError } = await supabase
-        .from('commessa')
-        .select('id, nome, organizzazione_id')
-        .in('id', commessaIds)
-      
-      if (commessaError) {
-        throw new Error(`Errore recupero dati commesse: ${commessaError.message}`)
-      }
-      
-      // Recupera i dati delle organizzazioni
-      const organizzazioneIds = commessaData?.map(c => c.organizzazione_id) || []
-      const { data: organizzazioneData, error: organizzazioneError } = await supabase
-        .from('organizzazione')
-        .select('id, nome')
-        .in('id', organizzazioneIds)
-      
-      if (organizzazioneError) {
-        throw new Error(`Errore recupero dati organizzazioni: ${organizzazioneError.message}`)
-      }
-      
-      // Ora costruisci i percorsi completi e recupera i file
       for (const gcode of gcodeData) {
         try {
-          const fileOrigine = fileOrigineData?.find(f => f.id === gcode.file_origine_id)
-          if (!fileOrigine) {
-            throw new Error(`File_origine non trovato per gcode_id: ${gcode.id}`)
-          }
-          
-          const commessa = commessaData?.find(c => c.id === fileOrigine.commessa_id)
-          if (!commessa) {
-            throw new Error(`Commessa non trovata per file_origine_id: ${fileOrigine.id}`)
-          }
-          
-          const organizzazione = organizzazioneData?.find(o => o.id === commessa.organizzazione_id)
-          if (!organizzazione) {
-            throw new Error(`Organizzazione non trovata per commessa_id: ${commessa.id}`)
-          }
-          
-          // Usa direttamente il nome_file del G-code che contiene già il percorso completo
           const percorsoCompleto = gcode.nome_file
+          const quantity = gcodeQuantities.get(gcode.id) || 1
           
-          console.log('🔍 Cercando file:', percorsoCompleto)
+          console.log(`🔍 Cercando file: ${percorsoCompleto} (quantità: ${quantity})`)
           
           // Recupera il file .gcode.3mf da Supabase Storage
           const { data: gcode3mfData, error: gcode3mfError } = await supabase.storage
@@ -362,38 +305,42 @@ export async function executeConcatenation(
           const gcode3mfFile = new File([gcode3mfData], gcode.nome_file, { 
             type: 'application/octet-stream' 
           })
-          gcode3mfFiles.push(gcode3mfFile)
           
-          console.log('✅ File .gcode.3mf recuperato:', percorsoCompleto)
+          // Estrai il contenuto G-code
+          const { modelGcode } = await readGcode3mfFile(gcode3mfFile)
+          
+          // Replica il contenuto in base alla quantità
+          for (let i = 0; i < quantity; i++) {
+            allGcodeContents.push(modelGcode)
+          }
+          
+          // Usa il primo file come base per il pacchetto
+          if (!baseFile) {
+            baseFile = gcode3mfFile
+          }
+          
+          console.log(`✅ G-code estratto e replicato ${quantity} volte da: ${percorsoCompleto}`)
         } catch (err) {
           console.error('❌ Errore recupero file .gcode.3mf:', gcode.id, err)
           throw new Error(`Impossibile recuperare file .gcode.3mf per gcode_id: ${gcode.id}`)
         }
       }
       
-      if (gcode3mfFiles.length === 0) {
-        throw new Error('Nessun file .gcode.3mf trovato per la concatenazione')
+      if (allGcodeContents.length === 0) {
+        throw new Error('Nessun contenuto G-code trovato per la concatenazione')
       }
       
-      // Usa il primo file come base e gli altri come aggiuntivi
-      const baseFile = gcode3mfFiles[0]
-      const additionalFiles = gcode3mfFiles.slice(1)
-      
-      // Estrai contenuti G-code dai file aggiuntivi
-      const additionalContents: string[] = []
-      
-      for (const file of additionalFiles) {
-        try {
-          const { modelGcode } = await readGcode3mfFile(file)
-          additionalContents.push(modelGcode)
-          console.log('✅ G-code estratto da:', file.name)
-        } catch (err) {
-          console.error('❌ Errore estrazione G-code da:', file.name, err)
-          throw new Error(`Impossibile estrarre G-code da ${file.name}`)
-        }
+      if (!baseFile) {
+        throw new Error('Nessun file base trovato per la concatenazione')
       }
       
-      console.log('✅ File base e aggiuntivi pronti, creando concatenazione...')
+      console.log(`📊 Totale contenuti G-code da concatenare: ${allGcodeContents.length}`)
+      
+      // Usa il primo contenuto come base e gli altri come aggiuntivi
+      const baseContent = allGcodeContents[0]
+      const additionalContents = allGcodeContents.slice(1)
+      
+      console.log('✅ Contenuti pronti, creando concatenazione...')
       const concatenatedPackage = await createConcatenatedGcode3mf(baseFile, additionalContents, outputFileName)
       
       // Valida il pacchetto creato
