@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabaseClient'
 import type { Stampante, StampanteStatus } from '@/types/stampante'
+import { getPrinterState, controlPrinter, getAvailablePrinters } from './homeAssistant'
+import type { PrinterState, PrinterServiceCall } from '@/types/homeAssistant'
 
 export async function listStampanti({ userId, isSuperuser = false }: { userId?: string, isSuperuser?: boolean } = {}): Promise<Stampante[]> {
   console.log('listStampanti chiamato con:', { userId, isSuperuser });
@@ -21,35 +23,32 @@ export async function listStampanti({ userId, isSuperuser = false }: { userId?: 
   return data || [];
 }
 
-// Funzioni per API stampanti
+// Funzioni per API stampanti tramite Home Assistant
 export async function getStampanteStatus(stampante: Stampante): Promise<StampanteStatus | null> {
   try {
-    // Usa l'API route del server per evitare problemi CORS
-    const response = await fetch(`/api/stampanti/${stampante.id}/status`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+    // Se la stampante ha un entity_id configurato, usa Home Assistant
+    if (stampante.entity_id) {
+      const haStatus = await getPrinterState(stampante.entity_id)
+      
+      if (haStatus.success && haStatus.data) {
+        return mapHAPrinterStateToStampanteStatus(stampante.id, haStatus.data)
+      } else {
+        return {
+          stampante_id: stampante.id,
+          stato: 'offline',
+          ultimo_aggiornamento: new Date().toISOString(),
+          error: haStatus.error || 'Errore Home Assistant'
+        }
+      }
     }
 
-    const status = await response.json();
-    
-    // Se c'è un errore nella risposta, restituisci null
-    if (status.error) {
-      console.error(`Errore API stampante ${stampante.nome}:`, status.error);
-      return {
-        stampante_id: stampante.id,
-        stato: 'offline',
-        ultimo_aggiornamento: new Date().toISOString(),
-        error: status.error
-      };
-    }
-
-    return status;
+    // Se non c'è entity_id, la stampante non è configurata per il monitoraggio
+    return {
+      stampante_id: stampante.id,
+      stato: 'offline',
+      ultimo_aggiornamento: new Date().toISOString(),
+      error: 'Stampante non configurata per monitoraggio remoto'
+    };
   } catch (error) {
     console.error(`Errore nel recupero status stampante ${stampante.nome}:`, error);
     return {
@@ -58,6 +57,38 @@ export async function getStampanteStatus(stampante: Stampante): Promise<Stampant
       ultimo_aggiornamento: new Date().toISOString(),
       error: error instanceof Error ? error.message : 'Errore di connessione'
     };
+  }
+}
+
+// Mappa lo stato di Home Assistant al formato della stampante
+function mapHAPrinterStateToStampanteStatus(stampanteId: number, haState: PrinterState): StampanteStatus {
+  return {
+    stampante_id: stampanteId,
+    stato: mapHAStateToStampanteState(haState.state),
+    temperatura_nozzle: haState.attributes.current_temperature,
+    temperatura_piatto: haState.attributes.bed_temperature,
+    percentuale_completamento: haState.attributes.print_progress,
+    tempo_rimanente: haState.attributes.time_remaining,
+    tempo_totale: haState.attributes.time_elapsed,
+    nome_file_corrente: haState.attributes.current_file,
+    ultimo_aggiornamento: haState.attributes.last_update || new Date().toISOString(),
+  }
+}
+
+// Mappa gli stati di Home Assistant agli stati della stampante
+function mapHAStateToStampanteState(haState: PrinterState['state']): StampanteStatus['stato'] {
+  switch (haState) {
+    case 'idle':
+      return 'pronta'
+    case 'printing':
+      return 'in_stampa'
+    case 'paused':
+      return 'pausa'
+    case 'error':
+      return 'errore'
+    case 'offline':
+    default:
+      return 'offline'
   }
 }
 
@@ -111,4 +142,36 @@ export async function getStampanteById(id: number): Promise<Stampante | null> {
 
   if (error) throw error
   return data
+}
+
+// Controlla una stampante tramite Home Assistant
+export async function controlStampante(stampante: Stampante, action: string, params?: Record<string, unknown>): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Se la stampante ha un entity_id configurato, usa Home Assistant
+    if (stampante.entity_id) {
+      const serviceCall: PrinterServiceCall = {
+        entity_id: stampante.entity_id,
+        service: action as PrinterServiceCall['service'],
+        data: params
+      }
+      
+      return await controlPrinter(serviceCall)
+    }
+
+    // Se non c'è entity_id, la stampante non è configurata per il controllo remoto
+    return {
+      success: false,
+      error: 'Stampante non configurata per controllo remoto'
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Errore di connessione'
+    }
+  }
+}
+
+// Ottieni le stampanti disponibili in Home Assistant
+export async function getAvailableHAPrinters(): Promise<PrinterState[]> {
+  return await getAvailablePrinters()
 } 

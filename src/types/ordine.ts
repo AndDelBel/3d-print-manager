@@ -1,6 +1,6 @@
 export interface Ordine {
   id: number;
-  stato: 'processamento' | 'in_coda' | 'in_stampa' | 'pronto' | 'consegnato';
+  stato: 'processamento' | 'in_coda' | 'in_stampa' | 'pronto' | 'consegnato' | 'error';
   gcode_id: number; // FK su gcode
   commessa_id: number;
   organizzazione_id: number;
@@ -9,4 +9,6 @@ export interface Ordine {
   consegna_richiesta?: string | null;
   note?: string | null;
   data_ordine: string;
+  data_inizio?: string | null; // Timestamp di inizio stampa
+  data_fine?: string | null; // Timestamp di fine stampa
 }

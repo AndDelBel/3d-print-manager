@@ -25,7 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="it" data-theme="dark">
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
+      <body className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
         <div className="min-h-screen bg-base-100">
           <Navbar />
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">

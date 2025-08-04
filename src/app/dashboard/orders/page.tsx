@@ -15,6 +15,8 @@ import type { Ordine } from '@/types/ordine'
 import { AlertMessage } from '@/components/AlertMessage'
 import { LoadingButton } from '@/components/LoadingButton'
 import { ConfirmModal } from '@/components/ConfirmModal'
+import { StatusChangeModal } from '@/components/StatusChangeModal'
+import { getStatusBadge } from '@/utils/statusUtils'
 import type { Organizzazione } from '@/types/organizzazione'
 import type { Commessa } from '@/types/commessa'
 import type { Gcode } from '@/types/gcode'
@@ -412,6 +414,7 @@ export default function OrdersPage() {
                               o.stato === 'pronto' ? 'badge-info' :
                               o.stato === 'in_stampa' ? 'badge-warning' :
                               o.stato === 'in_coda' ? 'badge-primary' :
+                              o.stato === 'error' ? 'badge-error' :
                               'badge-neutral'
                             }`}
                             disabled={false}
@@ -424,6 +427,7 @@ export default function OrdersPage() {
                             o.stato === 'pronto' ? 'badge-info' :
                             o.stato === 'in_stampa' ? 'badge-warning' :
                             o.stato === 'in_coda' ? 'badge-primary' :
+                            o.stato === 'error' ? 'badge-error' :
                             'badge-neutral'
                           }`}>
                             {o.stato}
@@ -521,66 +525,16 @@ export default function OrdersPage() {
       )}
 
       {/* Modal per cambio stato */}
-      {statusChangeTarget && (
-        <div className="modal modal-open">
-          <div className="modal-box">
-            <h3 className="font-bold text-lg mb-4">Modifica Stato Ordine #{statusChangeTarget.id}</h3>
-            <div className="mb-4">
-              <label className="label">
-                <span className="label-text">Stato attuale:</span>
-              </label>
-              <div className="p-2 bg-base-200 rounded text-sm">
-                <span className={`badge ${
-                  statusChangeTarget.stato === 'consegnato' ? 'badge-success' :
-                  statusChangeTarget.stato === 'pronto' ? 'badge-info' :
-                  statusChangeTarget.stato === 'in_stampa' ? 'badge-warning' :
-                  statusChangeTarget.stato === 'in_coda' ? 'badge-primary' :
-                  'badge-neutral'
-                }`}>
-                  {statusChangeTarget.stato}
-                </span>
-              </div>
-            </div>
-            <div className="mb-6">
-              <label className="label">
-                <span className="label-text">Nuovo stato:</span>
-              </label>
-              <div className="grid grid-cols-1 gap-2">
-                {['processamento','in_coda','in_stampa','pronto','consegnato'].map(s => (
-                  <button
-                    key={s}
-                    onClick={() => handleStatusChangeFromModal(s as Ordine['stato'])}
-                    disabled={statusChangeLoading || statusChangeTarget.stato === s}
-                    className={`btn btn-outline justify-start ${
-                      statusChangeTarget.stato === s ? 'btn-active' : ''
-                    }`}
-                  >
-                    <span className={`badge mr-2 ${
-                      s === 'consegnato' ? 'badge-success' :
-                      s === 'pronto' ? 'badge-info' :
-                      s === 'in_stampa' ? 'badge-warning' :
-                      s === 'in_coda' ? 'badge-primary' :
-                      'badge-neutral'
-                    }`}>
-                      {s}
-                    </span>
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="modal-action">
-              <button
-                onClick={() => setStatusChangeTarget(null)}
-                className="btn btn-ghost"
-                disabled={statusChangeLoading}
-              >
-                Annulla
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <StatusChangeModal
+        open={!!statusChangeTarget}
+        onClose={() => setStatusChangeTarget(null)}
+        onConfirm={handleStatusChangeFromModal}
+        currentStatus={statusChangeTarget?.stato || ''}
+        orderId={statusChangeTarget?.id || 0}
+        loading={statusChangeLoading}
+        availableStatuses={['processamento', 'in_coda', 'in_stampa', 'pronto', 'consegnato', 'error']}
+        getStatusBadge={getStatusBadge}
+      />
     </div>
   )
 }

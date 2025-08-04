@@ -28,10 +28,27 @@ export interface Gcode3mfPackage {
  * Calcola il checksum di un file
  */
 function calculateChecksum(content: string): string {
-  // Per ora usa un hash semplice, in futuro implementare CRC32
-  const hash = createHash('md5')
-  hash.update(content)
-  return hash.digest('hex')
+  try {
+    // Per file molto grandi, usa solo i primi e ultimi 1000 caratteri
+    if (content.length > 1000000) { // 1MB
+      const start = content.substring(0, 1000)
+      const end = content.substring(content.length - 1000)
+      const sample = start + end + content.length.toString()
+      
+      const hash = createHash('md5')
+      hash.update(sample)
+      return hash.digest('hex')
+    } else {
+      // Per file piccoli, usa tutto il contenuto
+      const hash = createHash('md5')
+      hash.update(content)
+      return hash.digest('hex')
+    }
+  } catch (error) {
+    console.warn('⚠️ Errore calcolo checksum, usando fallback:', error)
+    // Fallback: usa solo la lunghezza del file
+    return createHash('md5').update(content.length.toString()).digest('hex')
+  }
 }
 
 /**
@@ -364,28 +381,39 @@ export async function readGcode3mfFile(file: File): Promise<{
  * Concatena contenuti G-code con delimitatori
  */
 export function concatenateGcodeContent(gcodeContents: string[]): string {
-  let concatenated = ''
-  
-  for (let i = 0; i < gcodeContents.length; i++) {
-    const content = gcodeContents[i]
+  try {
+    let concatenated = ''
     
-    // Aggiungi separatore se non è il primo
-    if (i > 0) {
-      concatenated += '\n; ====== SEPARATORE TRA FILE ======\n'
+    for (let i = 0; i < gcodeContents.length; i++) {
+      const content = gcodeContents[i]
+      
+      // Aggiungi separatore se non è il primo
+      if (i > 0) {
+        concatenated += '\n; ====== SEPARATORE TRA FILE ======\n'
+      }
+      
+      // Aggiungi header per il file
+      concatenated += `; File ${i + 1} di ${gcodeContents.length}\n`
+      concatenated += `; ====== INIZIO FILE ${i + 1} ======\n`
+      
+      // Aggiungi il contenuto del G-code
+      concatenated += content
+      
+      // Aggiungi footer per il file
+      concatenated += '\n; ====== FINE FILE ${i + 1} ======\n'
+      
+      // Controlla la dimensione per evitare overflow
+      if (concatenated.length > 200 * 1024 * 1024) { // Aumentato a 200MB
+        console.warn('⚠️ Contenuto concatenato molto grande, troncando')
+        break
+      }
     }
     
-    // Aggiungi header per il file
-    concatenated += `; File ${i + 1} di ${gcodeContents.length}\n`
-    concatenated += `; ====== INIZIO FILE ${i + 1} ======\n`
-    
-    // Aggiungi il contenuto del G-code
-    concatenated += content
-    
-    // Aggiungi footer per il file
-    concatenated += '\n; ====== FINE FILE ${i + 1} ======\n'
+    return concatenated
+  } catch (error) {
+    console.error('❌ Errore concatenazione contenuto:', error)
+    throw new Error('Errore durante la concatenazione del contenuto G-code')
   }
-  
-  return concatenated
 }
 
 /**

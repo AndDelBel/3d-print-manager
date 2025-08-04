@@ -7,7 +7,7 @@ interface ConcatenationModalProps {
   open: boolean
   proposals: ConcatenationProposal[]
   onClose: () => void
-  onConfirm: (selectedProposals: ConcatenationProposal[]) => void
+  onConfirm: (selectedProposals: ConcatenationProposal[], autoDownload: boolean) => void
   loading?: boolean
 }
 
@@ -19,6 +19,7 @@ export function ConcatenationModal({
   loading = false
 }: ConcatenationModalProps) {
   const [selectedProposals, setSelectedProposals] = useState<Set<string>>(new Set())
+  const [autoDownload, setAutoDownload] = useState(true)
 
   const handleProposalToggle = (proposalId: string) => {
     const newSelected = new Set(selectedProposals)
@@ -32,7 +33,7 @@ export function ConcatenationModal({
 
   const handleConfirm = () => {
     const selected = proposals.filter(p => selectedProposals.has(p.id))
-    onConfirm(selected)
+    onConfirm(selected, autoDownload)
   }
 
   const handleClose = () => {
@@ -52,8 +53,21 @@ export function ConcatenationModal({
         <div className="mb-4">
           <p className="text-sm text-base-content/70 mb-4">
             Sono state trovate opportunità per concatenare file G-code Bambu Lab. 
-            La concatenazione può ridurre i tempi di stampa e ottimizzare l'uso del materiale.
+            La concatenazione può ridurre i tempi di stampa e ottimizzare l&apos;uso del materiale.
           </p>
+          
+          <div className="form-control">
+            <label className="label cursor-pointer">
+              <span className="label-text">Scarica automaticamente i file concatenati</span>
+              <input
+                type="checkbox"
+                className="checkbox checkbox-primary"
+                checked={autoDownload}
+                onChange={(e) => setAutoDownload(e.target.checked)}
+                disabled={loading}
+              />
+            </label>
+          </div>
         </div>
 
         {proposals.length === 0 ? (
@@ -99,7 +113,7 @@ export function ConcatenationModal({
                        <div>
                          <span className="text-base-content/70">Tempo stimato:</span>
                          <span className="ml-2">
-                           {proposal.estimatedTime > 0 ? `${proposal.estimatedTime}h` : 'Calcolo...'}
+                           {proposal.estimatedTime > 0 ? `${(proposal.estimatedTime / 60).toFixed(1)}h` : 'Calcolo...'}
                          </span>
                        </div>
                        <div>
@@ -119,7 +133,7 @@ export function ConcatenationModal({
                                {proposal.concatenatedPackage.metadata.originalFiles.length} file concatenati
                              </div>
                              <div className="text-xs text-success/60 mt-1">
-                               Tempo: {proposal.concatenatedPackage.metadata.totalTime} min | 
+                               Tempo: {(proposal.concatenatedPackage.metadata.totalTime / 60).toFixed(1)}h | 
                                Materiale: {proposal.concatenatedPackage.metadata.totalMaterial.toFixed(1)}g | 
                                Layer: {proposal.concatenatedPackage.metadata.totalLayers}
                              </div>

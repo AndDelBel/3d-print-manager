@@ -1,7 +1,7 @@
 // src/app/dashboard/stampanti/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useUser } from '@/hooks/useUser'
 import { listStampanti, createStampante, updateStampante, deleteStampante } from '@/services/stampante'
 import type { Stampante } from '@/types/stampante'
@@ -9,6 +9,8 @@ import { AlertMessage } from '@/components/AlertMessage'
 import { LoadingButton } from '@/components/LoadingButton'
 import { StampanteCard } from '@/components/StampanteCard'
 import { StampanteModal } from '@/components/StampanteModal'
+import { HomeAssistantConfig } from '@/components/HomeAssistantConfig'
+import { AvailablePrinters } from '@/components/AvailablePrinters'
 
 export default function StampantiPage() {
   const { loading, user } = useUser()
@@ -30,26 +32,26 @@ export default function StampantiPage() {
     }
   }, [loading, user, isSuperuser])
 
-  const handleRefresh = () => {
+  const handleRefresh = useCallback(() => {
     if (!user) return;
     setLoadingStampanti(true)
     listStampanti({ userId: user.id, isSuperuser })
       .then(setStampanti)
       .catch(() => setError('Errore caricamento stampanti'))
       .finally(() => setLoadingStampanti(false))
-  }
+  }, [user, isSuperuser])
 
-  const handleOpenModal = (stampante?: Stampante) => {
+  const handleOpenModal = useCallback((stampante?: Stampante) => {
     setSelectedStampante(stampante || null)
     setModalOpen(true)
-  }
+  }, [])
 
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     setModalOpen(false)
     setSelectedStampante(null)
-  }
+  }, [])
 
-  const handleSaveStampante = async (stampanteData: Partial<Stampante>) => {
+  const handleSaveStampante = useCallback(async (stampanteData: Partial<Stampante>) => {
     try {
       if (selectedStampante) {
         // Aggiorna stampante esistente
@@ -63,9 +65,9 @@ export default function StampantiPage() {
       console.error('Errore salvataggio stampante:', error)
       throw error
     }
-  }
+  }, [selectedStampante, handleRefresh])
 
-  const handleDeleteStampante = async (id: number) => {
+  const handleDeleteStampante = useCallback(async (id: number) => {
     if (confirm('Sei sicuro di voler eliminare questa stampante?')) {
       try {
         await deleteStampante(id)
@@ -75,7 +77,7 @@ export default function StampantiPage() {
         setError('Errore nell\'eliminazione della stampante')
       }
     }
-  }
+  }, [handleRefresh])
 
   if (loading) return <p>Caricamento…</p>
 
@@ -90,6 +92,12 @@ export default function StampantiPage() {
           >
             Test API
           </a>
+          <a
+            href="/dashboard/stampanti/test-ha"
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          >
+            Test Home Assistant
+          </a>
           <LoadingButton
             onClick={handleRefresh}
             loading={loadingStampanti}
@@ -98,6 +106,16 @@ export default function StampantiPage() {
             Aggiorna
           </LoadingButton>
         </div>
+      </div>
+
+      {/* Configurazione Home Assistant */}
+      <div className="mb-6">
+        <HomeAssistantConfig />
+      </div>
+
+      {/* Stampanti disponibili in Home Assistant */}
+      <div className="mb-6">
+        <AvailablePrinters />
       </div>
 
       {error && <AlertMessage type="error" message={error} onClose={() => setError(null)} />}

@@ -26,6 +26,7 @@ export function StampanteModal({
     tipo_sistema: undefined,
     endpoint_api: '',
     api_key: '',
+    entity_id: '',
     note: ''
   })
   const [loading, setLoading] = useState(false)
@@ -41,19 +42,21 @@ export function StampanteModal({
         tipo_sistema: stampante.tipo_sistema,
         endpoint_api: stampante.endpoint_api || '',
         api_key: stampante.api_key || '',
+        entity_id: stampante.entity_id || '',
         note: stampante.note || ''
       })
     } else {
-      setFormData({
-        nome: '',
-        modello: '',
-        seriale: '',
-        attiva: true,
-        tipo_sistema: undefined,
-        endpoint_api: '',
-        api_key: '',
-        note: ''
-      })
+              setFormData({
+          nome: '',
+          modello: '',
+          seriale: '',
+          attiva: true,
+          tipo_sistema: undefined,
+          endpoint_api: '',
+          api_key: '',
+          entity_id: '',
+          note: ''
+        })
     }
   }, [stampante])
 
@@ -205,24 +208,29 @@ export function StampanteModal({
               />
             </div>
 
-            {/* Istruzioni per tipo sistema */}
-            {formData.tipo_sistema === 'klipper' && (
-              <div className="mt-4 p-3 bg-info/10 border border-info/20 rounded text-info text-sm">
-                <strong>Configurazione Klipper:</strong><br />
-                • Endpoint: http://IP_STAMPANTE:7125<br />
-                • API Key: opzionale, configurabile in moonraker.conf<br />
-                • Esempio: http://192.168.1.100:7125
-              </div>
-            )}
+            <div className="mt-4">
+              <label className="block text-sm font-medium mb-1">
+                Entity ID Home Assistant
+              </label>
+              <input
+                type="text"
+                value={formData.entity_id}
+                onChange={(e) => handleInputChange('entity_id', e.target.value)}
+                className="input input-bordered w-full"
+                placeholder="es. printer.bambu_x1c, sensor.printer_temperature"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Entity ID della stampante in Home Assistant (opzionale)
+              </p>
+            </div>
 
-            {formData.tipo_sistema === 'bambu' && (
-              <div className="mt-4 p-3 bg-success/10 border border-success/20 rounded text-success text-sm">
-                <strong>Configurazione Bambu Lab:</strong><br />
-                • Endpoint: https://api.bambulab.com<br />
-                • API Key: Access Code dalla stampante<br />
-                • Device ID: ID dispositivo dalla stampante
-              </div>
-            )}
+            {/* Istruzioni per Home Assistant */}
+            <div className="mt-4 p-3 bg-info/10 border border-info/20 rounded text-info text-sm">
+              <strong>Configurazione Home Assistant:</strong><br />
+              • Entity ID: L&apos;entity ID della stampante in Home Assistant<br />
+              • Esempi: printer.bambu_x1c, sensor.printer_temperature<br />
+              • Assicurati che Home Assistant sia configurato nella sezione superiore
+            </div>
           </div>
 
           {/* Note */}

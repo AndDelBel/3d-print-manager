@@ -47,24 +47,34 @@ export function StampanteCard({ stampante, onEdit, onDelete, onRefresh, isSuperu
 
     setControlLoading(action)
     try {
-      const response = await fetch(`/api/stampanti/${stampante.id}/control`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ action, ...params }),
-      })
+      // Se la stampante ha un entity_id, usa Home Assistant
+      if (stampante.entity_id) {
+        const response = await fetch('/api/home-assistant/control', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            entity_id: stampante.entity_id,
+            service: action,
+            data: params 
+          }),
+        })
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`)
+        }
 
-      const result = await response.json()
-      if (result.success) {
-        // Ricarica lo status dopo il controllo
-        setTimeout(fetchStatus, 1000)
+        const result = await response.json()
+        if (result.success) {
+          // Ricarica lo status dopo il controllo
+          setTimeout(fetchStatus, 1000)
+        } else {
+          setError(`Errore controllo: ${result.error}`)
+        }
       } else {
-        setError(`Errore controllo: ${result.error}`)
+        // Se non c'è entity_id, la stampante non è configurata per il controllo
+        setError('Stampante non configurata per controllo remoto')
       }
     } catch (error) {
       setError(`Errore controllo: ${error instanceof Error ? error.message : 'Errore di connessione'}`)
@@ -282,9 +292,11 @@ export function StampanteCard({ stampante, onEdit, onDelete, onRefresh, isSuperu
       )}
 
       {/* Configurazione API */}
-      {!stampante.endpoint_api && (
+      {!stampante.entity_id && (
         <div className="mt-4 p-3 bg-warning/10 border border-warning/20 rounded text-warning text-sm">
           ⚠️ Stampante non configurata per monitoraggio remoto
+          <br />
+          <span className="text-xs">Aggiungi un Entity ID di Home Assistant per abilitare il monitoraggio</span>
         </div>
       )}
     </div>

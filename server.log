@@ -1,0 +1,24 @@
+
+> 3d-print-manager@0.1.0 dev
+> next dev --turbopack
+
+   ▲ Next.js 15.4.3 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://10.0.0.27:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 31.2s
+ ⚠ Webpack is configured while Turbopack is not, which may cause problems.
+ ⚠ See instructions if you need to configure Turbopack:
+  https://nextjs.org/docs/app/api-reference/next-config-js/turbopack
+
+ ○ Compiling /api/home-assistant/printers ...
+ ✓ Compiled /api/home-assistant/printers in 517ms
+Entità trovate in Home Assistant: 572
+Entità potenzialmente stampanti: []
+ GET /api/home-assistant/printers 200 in 1032ms
+Entità trovate in Home Assistant: 572
+Entità potenzialmente stampanti: []
+ GET /api/home-assistant/printers 200 in 50ms
+[?25h

@@ -2,9 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { addToCodaStampa } from '@/services/codaStampa'
-import { listStampanti } from '@/services/stampante'
 import { listOrders } from '@/services/ordine'
-import type { Stampante } from '@/types/stampante'
 import type { Ordine } from '@/types/ordine'
 import { LoadingButton } from './LoadingButton'
 
@@ -24,10 +22,8 @@ export function AddToQueueModal({
   isSuperuser 
 }: AddToQueueModalProps) {
   const [loading, setLoading] = useState(false)
-  const [stampanti, setStampanti] = useState<Stampante[]>([])
   const [ordini, setOrdini] = useState<Ordine[]>([])
   const [selectedOrdine, setSelectedOrdine] = useState<number | ''>('')
-  const [selectedStampante, setSelectedStampante] = useState<number | ''>('')
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -38,10 +34,6 @@ export function AddToQueueModal({
 
   const loadData = async () => {
     try {
-      // Carica stampanti attive
-      const stampantiData = await listStampanti({ isSuperuser })
-      setStampanti(stampantiData.filter(s => s.attiva))
-
       // Carica ordini disponibili (non in coda)
       const ordiniData = await listOrders({ 
         organizzazione_id: isSuperuser ? undefined : organizzazione_id,
@@ -49,7 +41,7 @@ export function AddToQueueModal({
       })
       // Filtra solo ordini che possono essere aggiunti alla coda
       const ordiniDisponibili = ordiniData.filter((o: Ordine) => 
-        o.stato === 'in_coda' || o.stato === 'processamento'
+        o.stato === 'processamento'
       )
       setOrdini(ordiniDisponibili)
     } catch (err) {
@@ -61,8 +53,8 @@ export function AddToQueueModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!selectedOrdine || !selectedStampante) {
-      setError('Seleziona un ordine e una stampante')
+    if (!selectedOrdine) {
+      setError('Seleziona un ordine')
       return
     }
 
@@ -70,12 +62,11 @@ export function AddToQueueModal({
     setError(null)
 
     try {
-      await addToCodaStampa(Number(selectedOrdine), Number(selectedStampante))
+      await addToCodaStampa(Number(selectedOrdine))
       onSuccess()
       onClose()
       // Reset form
       setSelectedOrdine('')
-      setSelectedStampante('')
     } catch (err) {
       console.error('Errore aggiunta alla coda:', err)
       setError('Errore nell\'aggiunta alla coda')
@@ -98,9 +89,9 @@ export function AddToQueueModal({
         )}
 
         <form onSubmit={handleSubmit}>
-          <div className="form-control mb-4">
+          <div className="form-control">
             <label className="label">
-              <span className="label-text">Ordine</span>
+              <span className="label-text">Seleziona Ordine</span>
             </label>
             <select
               className="select select-bordered w-full"
@@ -108,29 +99,10 @@ export function AddToQueueModal({
               onChange={(e) => setSelectedOrdine(e.target.value as number | '')}
               required
             >
-              <option value="">Seleziona un ordine</option>
-              {ordini.map(ordine => (
+              <option value="">Seleziona un ordine...</option>
+              {ordini.map((ordine) => (
                 <option key={ordine.id} value={ordine.id}>
-                  Ordine #{ordine.id} - Qty: {ordine.quantita} - {ordine.stato}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-control mb-6">
-            <label className="label">
-              <span className="label-text">Stampante</span>
-            </label>
-            <select
-              className="select select-bordered w-full"
-              value={selectedStampante}
-              onChange={(e) => setSelectedStampante(e.target.value as number | '')}
-              required
-            >
-              <option value="">Seleziona una stampante</option>
-              {stampanti.map(stampante => (
-                <option key={stampante.id} value={stampante.id}>
-                  {stampante.nome} {stampante.modello && `(${stampante.modello})`}
+                  Ordine #{ordine.id} - Qty: {ordine.quantita}
                 </option>
               ))}
             </select>
@@ -139,7 +111,7 @@ export function AddToQueueModal({
           <div className="modal-action">
             <button
               type="button"
-              className="btn btn-ghost"
+              className="btn"
               onClick={onClose}
               disabled={loading}
             >
@@ -147,16 +119,15 @@ export function AddToQueueModal({
             </button>
             <LoadingButton
               type="submit"
-              className="btn btn-primary"
               loading={loading}
-              disabled={!selectedOrdine || !selectedStampante}
+              className="btn btn-primary"
+              disabled={!selectedOrdine || loading}
             >
               Aggiungi alla Coda
             </LoadingButton>
           </div>
         </form>
       </div>
-      <div className="modal-backdrop" onClick={onClose}></div>
     </div>
   )
 } 

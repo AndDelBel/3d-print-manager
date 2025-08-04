@@ -10,6 +10,8 @@ export interface Stampante {
   tipo_sistema?: 'klipper' | 'bambu';
   endpoint_api?: string;
   api_key?: string;
+  // Campo per integrazione Home Assistant
+  entity_id?: string;
 }
 
 // Dati in tempo reale della stampante

@@ -1,0 +1,30 @@
+-- Script per aggiornare il constraint della tabella coda_stampa
+-- Esegui questo script nel SQL Editor di Supabase
+
+-- 1. Rimuovi il constraint esistente
+ALTER TABLE coda_stampa DROP CONSTRAINT IF EXISTS coda_stampa_stato_check;
+
+-- 2. Aggiungi il nuovo constraint con tutti gli stati supportati
+ALTER TABLE coda_stampa ADD CONSTRAINT coda_stampa_stato_check 
+CHECK (stato IN ('processamento', 'in_coda', 'in_stampa', 'pronto', 'consegnato', 'error'));
+
+-- 3. Aggiorna il valore di default se necessario
+ALTER TABLE coda_stampa ALTER COLUMN stato SET DEFAULT 'in_coda';
+
+-- 4. Verifica che il constraint sia stato applicato correttamente
+SELECT 
+    conname as constraint_name,
+    pg_get_constraintdef(oid) as constraint_definition
+FROM pg_constraint 
+WHERE conrelid = 'coda_stampa'::regclass 
+AND contype = 'c';
+
+-- 5. Verifica che la tabella coda_stampa abbia la struttura corretta
+SELECT 
+    column_name,
+    data_type,
+    is_nullable,
+    column_default
+FROM information_schema.columns 
+WHERE table_name = 'coda_stampa' 
+AND column_name = 'stato'; 

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabaseClient'
 import type { Gcode } from '@/types/gcode'
+import { analyzeGcodeFile, type GcodeAnalysis } from '@/utils/gcodeParser'
 
 function cleanName(str: string): string {
   return str
@@ -61,6 +62,28 @@ export async function uploadGcode(
   // Path: [nome_organizzazione]/[nome_commessa]/[nomefilestl]/[nomefilecompleto]
   const storageKey = `${orgNome}/${commessaNome}/${fileOrigineBase}/${gcodeFileName}`
 
+  // Analizza il G-code per estrarre informazioni automaticamente
+  let gcodeAnalysis: GcodeAnalysis | null = null
+  let gcodeMetadata: Record<string, string | undefined> | null = null
+  
+  try {
+    // Determina il tipo di file e analizzalo di conseguenza
+    const fileName = file.name.toLowerCase()
+    
+    if (fileName.endsWith('.gcode.3mf')) {
+      // Per file .gcode.3mf, estrai anche i metadati
+      const { extractGcodeMetadata } = await import('@/utils/gcodeParser')
+      gcodeMetadata = await extractGcodeMetadata(file)
+      console.log('Metadati .gcode.3mf estratti:', gcodeMetadata)
+    }
+    
+    gcodeAnalysis = await analyzeGcodeFile(file)
+    console.log('Analisi G-code completata:', gcodeAnalysis)
+  } catch (error) {
+    console.warn('Errore nell\'analisi del G-code:', error)
+    // Continua senza analisi se fallisce
+  }
+
   // Upload su storage
   const { error: upErr } = await supabase.storage.from('files').upload(storageKey, file, { upsert: false })
   if (upErr) {
@@ -70,16 +93,42 @@ export async function uploadGcode(
     throw upErr
   }
 
+  // Prepara i dati per l'inserimento nel DB
+  const gcodeData: Partial<Gcode> = {
+    file_origine_id,
+    nome_file: storageKey,
+    user_id: userId,
+    data_caricamento: new Date().toISOString(),
+    ...metadati
+  }
+
+  // Aggiungi i dati analizzati se disponibili
+  if (gcodeAnalysis) {
+    gcodeData.peso_grammi = gcodeAnalysis.peso_grammi
+    gcodeData.tempo_stampa_min = gcodeAnalysis.tempo_stampa_min || undefined
+    gcodeData.materiale = gcodeAnalysis.materiale
+    gcodeData.stampante = gcodeAnalysis.stampante
+  }
+
+  // Aggiungi metadati specifici per .gcode.3mf se disponibili
+  if (gcodeMetadata) {
+    // Estrai informazioni utili dai metadati
+    if (gcodeMetadata.material_name) {
+      gcodeData.materiale = gcodeMetadata.material_name
+    }
+    // I metadati vengono salvati nelle note per riferimento futuro
+    if (gcodeMetadata.print_settings_name || gcodeMetadata.printer_model) {
+      const metadataInfo = []
+      if (gcodeMetadata.print_settings_name) metadataInfo.push(`Profilo: ${gcodeMetadata.print_settings_name}`)
+      if (gcodeMetadata.printer_model) metadataInfo.push(`Stampante: ${gcodeMetadata.printer_model}`)
+      gcodeData.note = metadataInfo.join(', ')
+    }
+  }
+
   // Insert DB
   const { error: dbErr } = await supabase
     .from('gcode')
-    .insert([{
-      file_origine_id,
-      nome_file: storageKey,
-      user_id: userId,
-      data_caricamento: new Date().toISOString(),
-      ...metadati
-    }])
+    .insert([gcodeData])
   if (dbErr) throw dbErr
 }
 
@@ -98,4 +147,81 @@ export async function getGcodeDownloadUrl(path: string): Promise<string> {
     .createSignedUrl(path, 60) // 60 secondi di validità
   if (error || !data) throw error || new Error('URL non disponibile')
   return data.signedUrl
+}
+
+export async function updateGcodeAnalysis(id: number): Promise<void> {
+  try {
+    // Recupera il G-code
+    const { data: gcode, error: fetchError } = await supabase
+      .from('gcode')
+      .select('nome_file')
+      .eq('id', id)
+      .single()
+    
+    if (fetchError || !gcode) throw fetchError || new Error('G-code non trovato')
+
+    // Scarica il file dal storage
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from('files')
+      .download(gcode.nome_file)
+    
+    if (downloadError || !fileData) throw downloadError || new Error('Impossibile scaricare il file')
+
+    // Determina il nome del file dallo storage path
+    const fileName = gcode.nome_file.split('/').pop() || 'temp.gcode'
+    
+    // Converti il blob in File per l'analisi
+    const file = new File([fileData], fileName, { type: 'text/plain' })
+    
+    // Analizza il file usando la nuova logica che distingue tra .gcode e .gcode.3mf
+    const analysis = await analyzeGcodeFile(file)
+    
+    // Aggiorna il database
+    const { error: updateError } = await supabase
+      .from('gcode')
+      .update({
+        peso_grammi: analysis.peso_grammi,
+        tempo_stampa_min: analysis.tempo_stampa_min || undefined,
+        materiale: analysis.materiale,
+        stampante: analysis.stampante
+      })
+      .eq('id', id)
+    
+    if (updateError) throw updateError
+    
+    console.log('Analisi G-code aggiornata per ID:', id, analysis)
+  } catch (error) {
+    console.error('Errore nell\'aggiornamento dell\'analisi G-code:', error)
+    throw error
+  }
+}
+
+export async function analyzeAllGcodes(): Promise<void> {
+  try {
+    // Recupera tutti i G-code senza analisi
+    const { data: gcodes, error: fetchError } = await supabase
+      .from('gcode')
+      .select('id, nome_file')
+      .or('peso_grammi.is.null,tempo_stampa_min.is.null')
+    
+    if (fetchError) throw fetchError
+    
+    console.log(`Analizzando ${gcodes?.length || 0} G-code...`)
+    
+    for (const gcode of gcodes || []) {
+      try {
+        await updateGcodeAnalysis(gcode.id)
+        // Pausa per evitare sovraccarico
+        await new Promise(resolve => setTimeout(resolve, 100))
+      } catch (error) {
+        console.error(`Errore nell'analisi del G-code ${gcode.id}:`, error)
+        // Continua con gli altri
+      }
+    }
+    
+    console.log('Analisi di tutti i G-code completata')
+  } catch (error) {
+    console.error('Errore nell\'analisi di tutti i G-code:', error)
+    throw error
+  }
 } 

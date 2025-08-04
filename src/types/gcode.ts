@@ -7,6 +7,6 @@ export interface Gcode {
   peso_grammi?: number;
   tempo_stampa_min?: number;
   materiale?: string;
-  stampante_id?: number;
+  stampante?: string; // Nome della stampante estratto dal file
   note?: string;
 } 
