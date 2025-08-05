@@ -1,5 +1,6 @@
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import { useRetryFetch } from '@/hooks/useRetryFetch'
 import { supabase } from '@/lib/supabaseClient'
 import type { Utente } from '@/types/utente'
 
@@ -8,8 +9,10 @@ export function useUser() {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<Utente | null>(null)
 
-  useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+  const fetchUser = useCallback(async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession()
+      
       if (error) {
         setUser(null)
         setLoading(false)
@@ -34,7 +37,21 @@ export function useUser() {
         }
         setLoading(false)
       }
-    })
+    } catch (err) {
+      console.error('Errore nel caricamento utente:', err)
+      setUser(null)
+      setLoading(false)
+    }
+  }, [])
+
+  // Retry automatico ogni 10 secondi quando in loading
+  useRetryFetch(loading, fetchUser, {
+    retryInterval: 10000,
+    enabled: true
+  })
+
+  useEffect(() => {
+    fetchUser()
 
     // Ascolta i cambiamenti di autenticazione
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -59,7 +76,7 @@ export function useUser() {
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [fetchUser])
 
   return { loading, user }
 }

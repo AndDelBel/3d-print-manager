@@ -1,9 +1,10 @@
 // src/app/dashboard/files/page.tsx
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { useUser } from '@/hooks/useUser'
+import { useRetryFetch } from '@/hooks/useRetryFetch'
 import { listOrg } from '@/services/organizzazione'
 import { listCommesse } from '@/services/commessa'
 import { listFileOrigine, deleteFileOrigine } from '@/services/fileOrigine'
@@ -72,8 +73,7 @@ export default function FilesPage() {
 
 
 
-  // Carica file
-  useEffect(() => {
+  const loadFiles = useCallback(async () => {
     if (!loading) {
       // Per utenti non superuser, carica i file delle loro organizzazioni
       // Per superuser, carica tutti i file
@@ -145,6 +145,17 @@ export default function FilesPage() {
       }
     }
   }, [loading, isSuperuser, orgs])
+
+  // Retry automatico ogni 10 secondi quando in loading
+  useRetryFetch(loading, loadFiles, {
+    retryInterval: 10000,
+    enabled: true
+  })
+
+  // Carica file
+  useEffect(() => {
+    loadFiles()
+  }, [loadFiles])
 
 
 

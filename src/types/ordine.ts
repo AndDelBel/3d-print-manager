@@ -12,3 +12,15 @@ export interface Ordine {
   data_inizio?: string | null; // Timestamp di inizio stampa
   data_fine?: string | null; // Timestamp di fine stampa
 }
+
+// Extended type for analytics with relations
+export interface OrdineWithRelations extends Ordine {
+  gcode?: {
+    id: number;
+    nome_file: string;
+    peso_grammi?: number;
+    tempo_stampa_min?: number;
+    materiale?: string;
+    stampante_id?: number;
+  }[];
+}

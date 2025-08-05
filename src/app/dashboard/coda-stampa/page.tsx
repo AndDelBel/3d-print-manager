@@ -1,8 +1,9 @@
 // src/app/dashboard/coda-stampa/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useUser } from '@/hooks/useUser'
+import { useRetryFetch } from '@/hooks/useRetryFetch'
 import { listOrg } from '@/services/organizzazione'
 import { listOrders } from '@/services/ordine'
 import { listGcode } from '@/services/gcode'
@@ -75,7 +76,7 @@ export default function CodaStampaPage() {
     }
   }, [loading, isSuperuser, orgs])
 
-  const loadCoda = async () => {
+  const loadCoda = useCallback(async () => {
     setLoadingCoda(true)
     try {
       // Carica ordini
@@ -143,13 +144,19 @@ export default function CodaStampaPage() {
     } finally {
       setLoadingCoda(false)
     }
-  }
+  }, [orgId, isSuperuser])
+
+  // Retry automatico ogni 10 secondi quando in loading
+  useRetryFetch(loadingCoda, loadCoda, {
+    retryInterval: 10000,
+    enabled: true
+  })
 
   useEffect(() => {
     if (!loading) {
       loadCoda()
     }
-  }, [loading, orgId, isSuperuser])
+  }, [loading, loadCoda])
 
   // Funzioni helper per ottenere nomi
   const getOrgName = (orgId: number) => {

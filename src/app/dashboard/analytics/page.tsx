@@ -1,10 +1,12 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useUser } from '@/hooks/useUser'
+import { useRetryFetch } from '@/hooks/useRetryFetch'
 import { getAnalyticsData, type AnalyticsData, type FilterOptions } from '@/services/analytics'
 import AnalyticsCharts from '@/components/AnalyticsCharts'
 import ReportExporter from '@/components/ReportExporter'
+import { LoadingWithRetry } from '@/components/LoadingWithRetry'
 
 interface FilterState {
   period: 'week' | 'month' | 'quarter' | 'year'
@@ -27,34 +29,40 @@ export default function AnalyticsPage() {
   const [showAdvancedCharts, setShowAdvancedCharts] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
 
-  useEffect(() => {
-    const fetchAnalytics = async () => {
-      if (!user) return
+  const fetchAnalytics = useCallback(async () => {
+    if (!user) return
 
-      try {
-        setLoading(true)
-        setError(null)
+    try {
+      setLoading(true)
+      setError(null)
 
-        // Usa il nuovo servizio analytics
-        const analyticsData = await getAnalyticsData({
-          period: filters.period,
-          startDate: filters.startDate,
-          endDate: filters.endDate,
-          printerId: filters.printerId,
-          isSuperuser
-        })
+      // Usa il nuovo servizio analytics
+      const analyticsData = await getAnalyticsData({
+        period: filters.period,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        printerId: filters.printerId,
+        isSuperuser
+      })
 
-        setAnalytics(analyticsData)
-      } catch (err) {
-        setError('Errore nel caricamento delle statistiche')
-        console.error('Errore analytics:', err)
-      } finally {
-        setLoading(false)
-      }
+      setAnalytics(analyticsData)
+    } catch (err) {
+      setError('Errore nel caricamento delle statistiche')
+      console.error('Errore analytics:', err)
+    } finally {
+      setLoading(false)
     }
-
-    fetchAnalytics()
   }, [user, isSuperuser, filters])
+
+  // Retry automatico ogni 10 secondi quando in loading
+  useRetryFetch(loading, fetchAnalytics, {
+    retryInterval: 10000,
+    enabled: true
+  })
+
+  useEffect(() => {
+    fetchAnalytics()
+  }, [fetchAnalytics])
 
   const formatTime = (hours: number) => {
     const h = Math.floor(hours)
@@ -69,10 +77,9 @@ export default function AnalyticsPage() {
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Caricamento statistiche...</p>
-        </div>
+        <LoadingWithRetry 
+          message="Caricamento statistiche..." 
+        />
       </div>
     )
   }

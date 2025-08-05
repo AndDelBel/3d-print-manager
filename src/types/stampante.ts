@@ -1,44 +1,33 @@
 export interface Stampante {
-  id: number;
-  nome: string;
-  modello?: string;
-  seriale?: string;
-  attiva: boolean;
-  data_acquisto?: string;
-  note?: string;
-  // Campi per integrazione API
-  tipo_sistema?: 'klipper' | 'bambu';
-  endpoint_api?: string;
-  api_key?: string;
-  // Campo per integrazione Home Assistant
-  entity_id?: string;
+  id: number
+  unique_id: string // ID unico della stampante in Home Assistant
+  created_at: string
+  updated_at: string
 }
 
-// Dati in tempo reale della stampante
-export interface StampanteStatus {
-  stampante_id: number;
-  stato: 'pronta' | 'in_stampa' | 'pausa' | 'errore' | 'offline';
-  temperatura_nozzle?: number;
-  temperatura_piatto?: number;
-  temperatura_camera?: number;
-  percentuale_completamento?: number;
-  tempo_rimanente?: number; // in secondi
-  tempo_totale?: number; // in secondi
-  velocita_ventola?: number;
-  velocita_estrusore?: number;
-  nome_file_corrente?: string;
-  ultimo_aggiornamento: string;
-  error?: string; // Messaggio di errore se presente
+export interface CreateStampante {
+  unique_id: string
 }
 
-// Configurazione API per diversi sistemi
-export interface KlipperConfig {
-  endpoint: string;
-  api_key?: string;
+export interface UpdateStampante {
+  unique_id?: string
 }
 
-export interface BambuConfig {
-  endpoint: string;
-  access_code: string;
-  device_id: string;
+export interface ListStampantiParams {
+  userId?: number
+  isSuperuser?: boolean
+}
+
+// Tipo per i dati completi della stampante da Home Assistant
+export interface StampanteData extends Stampante {
+  // Dati da Home Assistant
+  entity_id: string
+  nome: string
+  stato: 'idle' | 'printing' | 'paused' | 'error' | 'offline'
+  hotend_temperature: number
+  bed_temperature: number
+  print_progress: number
+  time_remaining: number
+  current_file: string
+  last_update: string
 } 

@@ -32,22 +32,15 @@ export interface HomeAssistantStateResponse {
 // Stati specifici per le stampanti 3D
 export interface PrinterState {
   entity_id: string;
+  unique_id: string;
   state: 'idle' | 'printing' | 'paused' | 'error' | 'offline';
-  attributes: {
-    friendly_name?: string;
-    current_temperature?: number;
-    target_temperature?: number;
-    bed_temperature?: number;
-    bed_target_temperature?: number;
-    print_progress?: number;
-    time_remaining?: number;
-    time_elapsed?: number;
-    current_file?: string;
-    filament_used?: number;
-    fan_speed?: number;
-    flow_rate?: number;
-    last_update?: string;
-  };
+  friendly_name?: string;
+  hotend_temperature?: number;
+  bed_temperature?: number;
+  print_progress?: number;
+  time_remaining?: number;
+  current_file?: string;
+  last_update?: string;
 }
 
 // Configurazione per mappare le stampanti del database con le entità HA

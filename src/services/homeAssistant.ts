@@ -89,25 +89,21 @@ export async function getPrinterState(entityId: string): Promise<PrinterStatusRe
   try {
     const entity = await getEntityState(entityId)
     
+    // Estrai l'ID unico dal nome dell'entità
+    const uniqueId = entity.entity_id.replace('sensor.', '').replace('_printer_status', '')
+    
     // Mappa lo stato dell'entità al formato della stampante
     const printerState: PrinterState = {
       entity_id: entity.entity_id,
+      unique_id: uniqueId,
       state: mapEntityStateToPrinterState(entity.state),
-      attributes: {
-        friendly_name: entity.attributes.friendly_name as string | undefined,
-        current_temperature: entity.attributes.current_temperature as number | undefined,
-        target_temperature: entity.attributes.target_temperature as number | undefined,
-        bed_temperature: entity.attributes.bed_temperature as number | undefined,
-        bed_target_temperature: entity.attributes.bed_target_temperature as number | undefined,
-        print_progress: entity.attributes.print_progress as number | undefined,
-        time_remaining: entity.attributes.time_remaining as number | undefined,
-        time_elapsed: entity.attributes.time_elapsed as number | undefined,
-        current_file: entity.attributes.current_file as string | undefined,
-        filament_used: entity.attributes.filament_used as number | undefined,
-        fan_speed: entity.attributes.fan_speed as number | undefined,
-        flow_rate: entity.attributes.flow_rate as number | undefined,
-        last_update: entity.last_updated,
-      }
+      friendly_name: entity.attributes.friendly_name as string | undefined,
+      hotend_temperature: entity.attributes.hotend_temperature as number | undefined,
+      bed_temperature: entity.attributes.bed_temperature as number | undefined,
+      print_progress: entity.attributes.print_progress as number | undefined,
+      time_remaining: entity.attributes.time_remaining as number | undefined,
+      current_file: entity.attributes.current_file as string | undefined,
+      last_update: entity.last_updated,
     }
 
     return {
@@ -252,24 +248,20 @@ export async function getAvailablePrinters(): Promise<PrinterState[]> {
         // Mappa gli attributi dai template sensor
         const attributes = entity.attributes || {}
         
+        // Estrai l'ID unico dal nome dell'entità
+        const uniqueId = entity.entity_id.replace('sensor.', '').replace('_printer_status', '')
+        
         const printerState: PrinterState = {
           entity_id: entity.entity_id,
+          unique_id: uniqueId,
           state: mapEntityStateToPrinterState(entity.state),
-          attributes: {
-            friendly_name: attributes.friendly_name as string | undefined,
-            current_temperature: attributes.hotend_temperature as number | undefined,
-            target_temperature: attributes.target_temperature as number | undefined,
-            bed_temperature: attributes.bed_temperature as number | undefined,
-            bed_target_temperature: attributes.bed_target_temperature as number | undefined,
-            print_progress: attributes.print_progress as number | undefined,
-            time_remaining: attributes.time_remaining as number | undefined,
-            time_elapsed: attributes.time_elapsed as number | undefined,
-            current_file: attributes.current_file as string | undefined,
-            filament_used: attributes.filament_used as number | undefined,
-            fan_speed: attributes.fan_speed as number | undefined,
-            flow_rate: attributes.flow_rate as number | undefined,
-            last_update: entity.last_updated,
-          }
+          friendly_name: attributes.friendly_name as string | undefined,
+          hotend_temperature: attributes.hotend_temperature as number | undefined,
+          bed_temperature: attributes.bed_temperature as number | undefined,
+          print_progress: attributes.print_progress as number | undefined,
+          time_remaining: attributes.time_remaining as number | undefined,
+          current_file: attributes.current_file as string | undefined,
+          last_update: entity.last_updated,
         }
         
         printers.push(printerState)

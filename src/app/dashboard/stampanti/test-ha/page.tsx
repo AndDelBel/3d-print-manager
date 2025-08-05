@@ -3,121 +3,145 @@
 import { useState, useEffect } from 'react'
 import { getAvailablePrinters } from '@/services/homeAssistant'
 import type { PrinterState } from '@/types/homeAssistant'
-import { AlertMessage } from '@/components/AlertMessage'
-import { LoadingButton } from '@/components/LoadingButton'
 
 export default function TestHAPage() {
   const [printers, setPrinters] = useState<PrinterState[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const testConnection = async () => {
+  const loadPrinters = async () => {
     setLoading(true)
     setError(null)
-
+    
     try {
-      const availablePrinters = await getAvailablePrinters()
-      setPrinters(availablePrinters)
+      const data = await getAvailablePrinters()
+      setPrinters(data)
     } catch (err) {
-      setError('Errore nella connessione a Home Assistant')
-      console.error('Errore test HA:', err)
+      setError('Errore nel caricamento delle stampanti')
+      console.error('Errore caricamento stampanti:', err)
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    testConnection()
+    loadPrinters()
   }, [])
 
-  const getStatusColor = (state: string) => {
-    switch (state) {
-      case 'idle': return 'bg-green-100 text-green-800'
-      case 'printing': return 'bg-blue-100 text-blue-800'
-      case 'paused': return 'bg-yellow-100 text-yellow-800'
-      case 'error': return 'bg-red-100 text-red-800'
-      case 'offline': return 'bg-gray-100 text-gray-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
-
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Test Home Assistant</h1>
-        <LoadingButton
-          onClick={testConnection}
-          loading={loading}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          Test Connessione
-        </LoadingButton>
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          Test Home Assistant
+        </h1>
+        <p className="text-gray-600 dark:text-gray-400">
+          Test dell'integrazione con Home Assistant
+        </p>
       </div>
 
-      {error && <AlertMessage type="error" message={error} onClose={() => setError(null)} />}
+      <div className="mb-6">
+        <button
+          onClick={loadPrinters}
+          disabled={loading}
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+        >
+          {loading ? 'Caricamento...' : 'Aggiorna Dati'}
+        </button>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {printers.map((printer) => (
-          <div key={printer.entity_id} className="bg-white rounded-lg shadow-md p-6 border">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-lg font-semibold">
-                  {printer.attributes.friendly_name || printer.entity_id}
-                </h3>
-                <p className="text-sm text-gray-500">{printer.entity_id}</p>
-              </div>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(printer.state)}`}>
-                {printer.state}
-              </span>
-            </div>
+      {error && (
+        <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+          {error}
+        </div>
+      )}
 
-            <div className="space-y-2">
-              {printer.attributes.current_temperature && (
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Temperatura Nozzle:</span>
-                  <span className="font-medium">{printer.attributes.current_temperature}°C</span>
-                </div>
-              )}
-              
-              {printer.attributes.bed_temperature && (
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Temperatura Piatto:</span>
-                  <span className="font-medium">{printer.attributes.bed_temperature}°C</span>
-                </div>
-              )}
-              
-              {printer.attributes.print_progress !== undefined && (
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Progresso:</span>
-                  <span className="font-medium">{printer.attributes.print_progress.toFixed(1)}%</span>
-                </div>
-              )}
-              
-              {printer.attributes.current_file && (
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+      ) : printers.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-gray-500 dark:text-gray-400">
+            Nessuna stampante trovata in Home Assistant
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Stampanti Trovate ({printers.length})
+          </h2>
+          
+          {printers.map((printer, index) => (
+            <div key={index} className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 border border-gray-200 dark:border-gray-700">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <span className="text-sm text-gray-600">File corrente:</span>
-                  <p className="text-sm font-medium truncate" title={printer.attributes.current_file}>
-                    {printer.attributes.current_file}
+                  <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
+                    {printer.friendly_name || printer.unique_id}
+                  </h3>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Entity ID:</span>
+                      <span className="text-gray-900 dark:text-white font-mono">{printer.entity_id}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Unique ID:</span>
+                      <span className="text-gray-900 dark:text-white font-mono">{printer.unique_id}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Stato:</span>
+                      <span className="text-gray-900 dark:text-white">{printer.state}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium text-gray-900 dark:text-white mb-2">Dati Sensori</h4>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Temperatura Ugello:</span>
+                      <span className="text-gray-900 dark:text-white">
+                        {printer.hotend_temperature ? `${printer.hotend_temperature}°C` : '--'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Temperatura Piatto:</span>
+                      <span className="text-gray-900 dark:text-white">
+                        {printer.bed_temperature ? `${printer.bed_temperature}°C` : '--'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Progresso:</span>
+                      <span className="text-gray-900 dark:text-white">
+                        {printer.print_progress ? `${printer.print_progress}%` : '--'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Tempo Rimanente:</span>
+                      <span className="text-gray-900 dark:text-white">
+                        {printer.time_remaining ? `${Math.floor(printer.time_remaining / 3600)}h ${Math.floor((printer.time_remaining % 3600) / 60)}m` : '--'}
+                      </span>
+                    </div>
+                    {printer.current_file && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">File Corrente:</span>
+                        <span className="text-gray-900 dark:text-white truncate max-w-xs" title={printer.current_file}>
+                          {printer.current_file}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {printer.last_update && (
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Ultimo aggiornamento: {new Date(printer.last_update).toLocaleString('it-IT')}
                   </p>
                 </div>
               )}
-              
-              {printer.attributes.last_update && (
-                <div className="text-xs text-gray-500 mt-2">
-                  Ultimo aggiornamento: {new Date(printer.attributes.last_update).toLocaleString()}
-                </div>
-              )}
             </div>
-          </div>
-        ))}
-      </div>
-
-      {printers.length === 0 && !loading && (
-        <div className="text-center py-8">
-          <p className="text-gray-500">Nessuna stampante trovata in Home Assistant</p>
-          <p className="text-sm text-gray-400 mt-2">
-            Assicurati che Home Assistant sia configurato correttamente e che ci siano entità stampante disponibili.
-          </p>
+          ))}
         </div>
       )}
     </div>
