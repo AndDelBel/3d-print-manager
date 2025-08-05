@@ -185,6 +185,76 @@ function mapPrinterServiceToHAService(printerService: PrinterServiceCall['servic
   }
 }
 
+// Ottieni solo le entità stampante specifiche dal database
+export async function getSpecificPrinters(uniqueIds: string[]): Promise<PrinterState[]> {
+  try {
+    // Verifica che Home Assistant sia configurato
+    const haConfig = await getHomeAssistantConfig()
+    if (!haConfig || !haConfig.base_url || !haConfig.access_token) {
+      console.log('Home Assistant non configurato')
+      return []
+    }
+
+    if (uniqueIds.length === 0) {
+      return []
+    }
+
+    const printers: PrinterState[] = []
+
+    // Per ogni unique_id, costruisci l'entity_id e recupera lo stato
+    for (const uniqueId of uniqueIds) {
+      try {
+        // Costruisci l'entity_id basandoti sul pattern conosciuto
+        const entityId = `sensor.${uniqueId}_printer_status`
+        
+        console.log(`Recupero stato per entità: ${entityId}`)
+        
+        const entity = await getEntityState(entityId)
+        
+        // Mappa gli attributi dai template sensor
+        const attributes = entity.attributes || {}
+        
+        const printerState: PrinterState = {
+          entity_id: entity.entity_id,
+          unique_id: uniqueId,
+          state: mapEntityStateToPrinterState(entity.state),
+          friendly_name: attributes.friendly_name as string | undefined,
+          hotend_temperature: attributes.hotend_temperature as number | undefined,
+          bed_temperature: attributes.bed_temperature as number | undefined,
+          print_progress: attributes.print_progress as number | undefined,
+          time_remaining: attributes.time_remaining as number | undefined,
+          current_file: attributes.current_file as string | undefined,
+          last_update: entity.last_updated,
+        }
+        
+        printers.push(printerState)
+        console.log(`Stato recuperato per ${uniqueId}:`, printerState.state)
+        
+      } catch (error) {
+        console.error(`Errore nel recupero stato per ${uniqueId}:`, error)
+        // Aggiungi una stampante offline se non riesci a recuperare lo stato
+        printers.push({
+          entity_id: `sensor.${uniqueId}_printer_status`,
+          unique_id: uniqueId,
+          state: 'offline',
+          friendly_name: uniqueId,
+          hotend_temperature: 0,
+          bed_temperature: 0,
+          print_progress: 0,
+          time_remaining: 0,
+          current_file: '',
+          last_update: new Date().toISOString(),
+        })
+      }
+    }
+
+    return printers
+  } catch (error) {
+    console.error('Errore nel recupero delle stampanti specifiche:', error)
+    return []
+  }
+}
+
 // Ottieni tutte le entità stampante disponibili
 export async function getAvailablePrinters(): Promise<PrinterState[]> {
   try {

@@ -1,5 +1,5 @@
 // La coda di stampa ora è un filtro degli ordini con stati specifici
-export type CodaStampaStato = 'in_coda' | 'in_stampa' | 'pronto' | 'error';
+export type CodaStampaStato = 'in_coda' | 'in_stampa' | 'pronto' | 'consegnato' | 'error';
 
 // Tipo per gli ordini in coda con relazioni estese
 export interface OrdineInCoda {
@@ -23,7 +23,7 @@ export interface OrdineInCoda {
     peso_grammi?: number;
     tempo_stampa_min?: number;
     materiale?: string;
-    stampante_id?: number;
+    stampante?: string;
   }[];
   commessa?: {
     id: number;

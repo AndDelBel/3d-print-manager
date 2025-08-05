@@ -41,8 +41,8 @@ export default function AnalyticsPage() {
         period: filters.period,
         startDate: filters.startDate,
         endDate: filters.endDate,
-        printerId: filters.printerId,
-        isSuperuser
+        isSuperuser,
+        userId: user?.id ? parseInt(user.id) : undefined
       })
 
       setAnalytics(analyticsData)

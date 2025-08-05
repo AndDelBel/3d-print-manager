@@ -42,7 +42,7 @@ export async function listCodaStampaWithRelations({
         nome
       )
     `)
-    .in('stato', ['in_coda', 'in_stampa', 'pronto', 'error'])
+    .in('stato', ['in_coda', 'in_stampa', 'pronto'])
 
   if (!isSuperuser && organizzazione_id) {
     query = query.eq('organizzazione_id', organizzazione_id)
@@ -84,7 +84,7 @@ export async function listCodaStampa({
   let query = supabase
     .from('ordine')
     .select('*')
-    .in('stato', ['in_coda', 'in_stampa', 'pronto', 'error'])
+    .in('stato', ['in_coda', 'in_stampa', 'pronto'])
 
   if (!isSuperuser && organizzazione_id) {
     query = query.eq('organizzazione_id', organizzazione_id)
@@ -138,6 +138,18 @@ export async function updateCodaStampaStatus(
     .eq('id', id)
   
   if (error) throw error
+  
+  // Se lo stato è "error", crea automaticamente un duplicato
+  if (stato === 'error') {
+    try {
+      const { duplicateOrder } = await import('@/services/ordine')
+      await duplicateOrder(id)
+      console.log(`🔄 Ordine #${id} messo in errore e duplicato automaticamente`)
+    } catch (duplicateError) {
+      console.error('Errore duplicazione ordine dopo errore:', duplicateError)
+      // Non blocchiamo l'operazione principale se la duplicazione fallisce
+    }
+  }
 }
 
 // Rimuovi dalla coda (cambia stato a processamento)
@@ -152,6 +164,18 @@ export async function removeFromCodaStampa(id: number): Promise<void> {
 
 // Ottieni prossimo ordine in coda per stampante
 export async function getNextInQueue(stampante_id: number): Promise<OrdineInCoda | null> {
+  // Prima ottieni il nome della stampante
+  const { data: stampante, error: stampanteError } = await supabase
+    .from('stampante')
+    .select('nome')
+    .eq('id', stampante_id)
+    .single()
+  
+  if (stampanteError || !stampante) {
+    console.error('Errore recupero stampante:', stampanteError)
+    return null
+  }
+
   const { data, error } = await supabase
     .from('ordine')
     .select(`
@@ -171,11 +195,11 @@ export async function getNextInQueue(stampante_id: number): Promise<OrdineInCoda
         peso_grammi,
         tempo_stampa_min,
         materiale,
-        stampante_id
+        stampante
       )
     `)
     .eq('stato', 'in_coda')
-    .eq('gcode.stampante_id', stampante_id)
+    .eq('gcode.stampante', stampante.nome)
     .order('consegna_richiesta', { ascending: true })
     .order('data_ordine', { ascending: true })
     .limit(1)
@@ -206,12 +230,7 @@ export async function getStampanteNameByGcodeId(gcode_id: number): Promise<strin
     const { data, error } = await supabase
       .from('gcode')
       .select(`
-        stampante_id,
-        stampante (
-          id,
-          nome,
-          modello
-        )
+        stampante
       `)
       .eq('id', gcode_id)
       .single()
@@ -221,7 +240,7 @@ export async function getStampanteNameByGcodeId(gcode_id: number): Promise<strin
       return null
     }
 
-    return data?.stampante?.[0]?.nome || null
+    return data?.stampante || null
   } catch (error) {
     console.error('Errore recupero nome stampante:', error)
     return null

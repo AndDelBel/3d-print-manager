@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { listStampanti } from '@/services/stampante'
-import { getAvailablePrinters } from '@/services/homeAssistant'
+import { getSpecificPrinters } from '@/services/homeAssistant'
 
 export async function GET(request: Request) {
   try {
@@ -16,8 +16,11 @@ export async function GET(request: Request) {
     // Ottieni stampanti dal database
     const dbStampanti = await listStampanti(params)
     
-    // Ottieni stampanti da Home Assistant
-    const haPrinters = await getAvailablePrinters()
+    // Estrai gli unique_id delle stampanti dal database
+    const uniqueIds = dbStampanti.map(stampante => stampante.unique_id)
+    
+    // Ottieni solo le stampanti specifiche da Home Assistant
+    const haPrinters = await getSpecificPrinters(uniqueIds)
     
     // Combina i dati
     const stampantiCompletate = dbStampanti.map(stampante => {
@@ -36,8 +39,20 @@ export async function GET(request: Request) {
           last_update: haData.last_update || new Date().toISOString(),
         }
       }
-      return null
-    }).filter(Boolean)
+      // Se non troviamo i dati HA, crea una stampante offline
+      return {
+        ...stampante,
+        entity_id: `sensor.${stampante.unique_id}_printer_status`,
+        nome: stampante.unique_id,
+        stato: 'offline' as const,
+        hotend_temperature: 0,
+        bed_temperature: 0,
+        print_progress: 0,
+        time_remaining: 0,
+        current_file: '',
+        last_update: new Date().toISOString(),
+      }
+    })
     
     return NextResponse.json({ success: true, stampanti: stampantiCompletate })
   } catch (error) {

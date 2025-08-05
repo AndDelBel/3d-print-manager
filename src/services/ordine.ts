@@ -138,6 +138,17 @@ export async function updateOrderStatus(
     .eq('id', id)
   
   if (error) throw error
+  
+  // Se lo stato è "error", crea automaticamente un duplicato
+  if (stato === 'error') {
+    try {
+      await duplicateOrder(id)
+      console.log(`🔄 Ordine #${id} messo in errore e duplicato automaticamente`)
+    } catch (duplicateError) {
+      console.error('Errore duplicazione ordine dopo errore:', duplicateError)
+      // Non blocchiamo l'operazione principale se la duplicazione fallisce
+    }
+  }
 }
 
 export async function updateOrderGcode(
@@ -225,4 +236,54 @@ export async function listOrdersByFileOrigine(file_origine_id: number): Promise<
   
   if (error) throw error;
   return data || [];
+}
+
+export async function getOrder(id: number): Promise<Ordine | null> {
+  const { data, error } = await supabase
+    .from('ordine')
+    .select('*')
+    .eq('id', id)
+    .single()
+  
+  if (error) {
+    console.error('Errore recupero ordine:', error)
+    return null
+  }
+  
+  return data
+}
+
+export async function duplicateOrder(originalOrderId: number): Promise<number> {
+  // Ottieni l'ordine originale
+  const originalOrder = await getOrder(originalOrderId)
+  if (!originalOrder) {
+    throw new Error('Ordine originale non trovato')
+  }
+  
+  // Crea un nuovo ordine con gli stessi dati ma stato "in_coda" e note aggiornate
+  const newOrder: Partial<Ordine> = {
+    gcode_id: originalOrder.gcode_id,
+    commessa_id: originalOrder.commessa_id,
+    organizzazione_id: originalOrder.organizzazione_id,
+    user_id: originalOrder.user_id,
+    quantita: originalOrder.quantita,
+    stato: 'in_coda',
+    data_ordine: new Date().toISOString(),
+    consegna_richiesta: originalOrder.consegna_richiesta,
+    note: 'ristampa per errore'
+  }
+  
+  const { data, error } = await supabase
+    .from('ordine')
+    .insert([newOrder])
+    .select('id')
+    .single()
+  
+  if (error) {
+    console.error('Errore duplicazione ordine:', error)
+    throw error
+  }
+  
+  console.log(`✅ Ordine #${originalOrderId} duplicato come ordine #${data.id}`)
+  return data.id
 }

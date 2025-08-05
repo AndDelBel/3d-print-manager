@@ -2,7 +2,6 @@
 'use client'
 
 import { useUser } from '@/hooks/useUser'
-import { AuthDebug } from '@/components/AuthDebug'
 
 export default function DashboardPage() {
   const { loading, user } = useUser()
@@ -19,10 +18,7 @@ export default function DashboardPage() {
     <div>
       <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
       
-      {/* Debug component */}
-      <div className="mb-6">
-        <AuthDebug />
-      </div>
+
       
       {user ? (
         <div>

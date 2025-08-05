@@ -86,7 +86,7 @@ export default function CodaStampaPage() {
       })
       
       // Filtra solo ordini in coda
-      const codaOrders = ordersList.filter(o => ['in_coda', 'in_stampa', 'pronto', 'error'].includes(o.stato))
+      const codaOrders = ordersList.filter(o => ['in_coda', 'in_stampa', 'pronto'].includes(o.stato))
       
       // Ordina per priorità: consegna_richiesta (priorità 1), data_ordine (priorità 2)
       const sortedCodaOrders = codaOrders.sort((a, b) => {
@@ -203,7 +203,7 @@ export default function CodaStampaPage() {
 
   // Converti ordini in formato OrdineInCoda
   const codaData = orders
-    .filter(order => ['in_coda', 'in_stampa', 'pronto', 'error'].includes(order.stato))
+    .filter(order => ['in_coda', 'in_stampa', 'pronto'].includes(order.stato))
     .map(order => {
       const gcode = gcodes.get(order.gcode_id)
       const commessa = commesse.find(c => c.id === order.commessa_id)
@@ -405,7 +405,7 @@ export default function CodaStampaPage() {
           currentStatus={statusChangeTarget?.stato || ''}
           orderId={statusChangeTarget?.id || 0}
           loading={statusChangeLoading}
-          availableStatuses={['in_coda', 'in_stampa', 'pronto', 'error']}
+          availableStatuses={['in_coda', 'in_stampa', 'pronto', 'consegnato', 'error']}
           getStatusBadge={getStatusBadge}
         />
       )}

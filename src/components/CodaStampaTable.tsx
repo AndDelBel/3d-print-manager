@@ -20,11 +20,8 @@ export function CodaStampaTable({ coda, isSuperuser, onRefresh, onStatusChange }
     const loadStampanteNames = async () => {
       const names = new Map<number, string>()
       for (const item of coda) {
-        if (item.gcode?.[0]?.stampante_id && !names.has(item.gcode[0].stampante_id)) {
-          const name = await getStampanteNameByGcodeId(item.gcode[0].stampante_id)
-          if (name) {
-            names.set(item.gcode[0].stampante_id, name)
-          }
+        if (item.gcode?.[0]?.stampante && !names.has(item.gcode[0].id)) {
+          names.set(item.gcode[0].id, item.gcode[0].stampante)
         }
       }
       setStampanteNames(names)
@@ -55,11 +52,9 @@ export function CodaStampaTable({ coda, isSuperuser, onRefresh, onStatusChange }
     return new Date(dateString).toLocaleDateString('it-IT')
   }
 
-  const getStampanteDisplay = (gcode: { stampante_id?: number } | undefined) => {
-    if (!gcode?.stampante_id) return 'N/A'
-    
-    const stampanteName = stampanteNames.get(gcode.stampante_id)
-    return stampanteName || `Stampante #${gcode.stampante_id}`
+  const getStampanteDisplay = (gcode: { stampante?: string } | undefined) => {
+    if (!gcode?.stampante) return 'N/A'
+    return gcode.stampante
   }
 
   return (

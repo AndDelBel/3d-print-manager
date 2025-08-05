@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabaseClient'
 import type { Ordine, OrdineWithRelations } from '@/types/ordine'
+import type { PrinterState } from '@/types/homeAssistant'
 
 export interface AnalyticsData {
   // Statistiche generali
@@ -53,17 +54,18 @@ export interface FilterOptions {
   endDate?: string
   organizzazione_id?: number
   isSuperuser?: boolean
+  userId?: number
 }
 
 export async function getAnalyticsData(filters: FilterOptions = {}): Promise<AnalyticsData> {
-  const { period = 'month', startDate, endDate, organizzazione_id, isSuperuser = false } = filters
+  const { period = 'month', startDate, endDate, organizzazione_id, isSuperuser = false, userId } = filters
 
   try {
     // Fetch dati base
     const [ordini, commesse, stampanti] = await Promise.all([
       listOrders({ organizzazione_id, isSuperuser }),
       listCommesse({ organizzazione_id, isSuperuser }),
-      listStampanti({ organizzazione_id, isSuperuser })
+      listStampanti({ userId, isSuperuser })
     ])
 
     // Filtra ordini consegnati
@@ -105,7 +107,7 @@ export async function getAnalyticsData(filters: FilterOptions = {}): Promise<Ana
     // Statistiche stampanti
     const printerStats = stampanti.map(stampante => {
       const ordersForPrinter = deliveredOrders.filter(o => 
-        o.gcode && o.gcode[0] && o.gcode[0].stampante_id === stampante.id
+        o.gcode && o.gcode[0] && o.gcode[0].stampante === stampante.nome
       )
       const successRate = ordersForPrinter.length > 0 ? Math.floor(Math.random() * 30) + 70 : 0 // 70-100%
       const averagePrintTime = ordersForPrinter.length > 0 ? Math.random() * 4 + 2 : 0 // 2-6 ore
@@ -188,7 +190,7 @@ async function listOrders({ organizzazione_id, isSuperuser = false }: { organizz
         peso_grammi,
         tempo_stampa_min,
         materiale,
-        stampante_id
+        stampante
       )
     `)
     .order('data_ordine', { ascending: false })
@@ -213,14 +215,43 @@ async function listCommesse({ organizzazione_id, isSuperuser = false }: { organi
   return data || []
 }
 
-async function listStampanti({ organizzazione_id, isSuperuser = false }: { organizzazione_id?: number, isSuperuser?: boolean } = {}) {
-  const { data, error } = await supabase
-    .from('stampante')
+async function listStampanti({ userId, isSuperuser = false }: { userId?: number, isSuperuser?: boolean } = {}) {
+  // Usa la stessa logica della pagina stampanti per ottenere i dati completi
+  const { data: dbData, error } = await supabase
+    .from('stampanti')
     .select('*')
-    .order('nome')
+    .order('unique_id')
   
   if (error) throw error
-  return data || []
+  
+  const dbStampanti = dbData || []
+  
+  // Ottieni stampanti da Home Assistant tramite l'API del server
+  const response = await fetch('/api/home-assistant/printers')
+  const haResponse = await response.json()
+  const haPrinters = haResponse.success ? haResponse.printers : []
+  
+  // Combina i dati come nella pagina stampanti
+  const stampantiCompletate = dbStampanti.map(stampante => {
+    const haData = haPrinters.find((p: PrinterState) => p.unique_id === stampante.unique_id)
+    if (haData) {
+      return {
+        ...stampante,
+        entity_id: haData.entity_id,
+        nome: haData.friendly_name || stampante.unique_id,
+        stato: haData.state,
+        hotend_temperature: haData.hotend_temperature || 0,
+        bed_temperature: haData.bed_temperature || 0,
+        print_progress: haData.print_progress || 0,
+        time_remaining: haData.time_remaining || 0,
+        current_file: haData.current_file || '',
+        last_update: haData.last_update || new Date().toISOString(),
+      }
+    }
+    return null
+  }).filter(Boolean)
+  
+  return stampantiCompletate
 }
 
 // Funzione per ottenere statistiche dettagliate per un periodo specifico
@@ -242,8 +273,8 @@ export async function getDetailedStats(startDate: string, endDate: string, organ
 }
 
 // Funzione per calcolare KPI specifici
-export async function getKPIs(organizzazione_id?: number, isSuperuser = false) {
-  const analytics = await getAnalyticsData({ organizzazione_id, isSuperuser })
+export async function getKPIs(organizzazione_id?: number, isSuperuser = false, userId?: number) {
+  const analytics = await getAnalyticsData({ organizzazione_id, isSuperuser, userId })
   
   return {
     deliverySuccessRate: analytics.deliveredOrders.total > 0 

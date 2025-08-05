@@ -21,6 +21,6 @@ export interface OrdineWithRelations extends Ordine {
     peso_grammi?: number;
     tempo_stampa_min?: number;
     materiale?: string;
-    stampante_id?: number;
+    stampante?: string;
   }[];
 }

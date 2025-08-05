@@ -129,7 +129,7 @@ export function StampanteCard({ stampante, onDelete, onRefresh }: StampanteCardP
           </div>
         </div>
 
-        {stampante.stato === 'printing' && (
+        {(stampante.stato === 'printing' || stampante.stato === 'paused') && (
           <div className="space-y-3">
             <div>
               <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
