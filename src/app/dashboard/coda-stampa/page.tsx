@@ -136,10 +136,8 @@ export default function CodaStampaPage() {
       fileOrigineArr.forEach(f => fileMap.set(f.id, f))
       setFileOrigineMap(fileMap)
 
-      console.log('📋 Coda stampa caricata:', codaOrders.length, 'elementi')
       setError(null)
     } catch (err) {
-      console.error('Errore caricamento coda stampa:', err)
       setError('Errore caricamento coda stampa')
     } finally {
       setLoadingCoda(false)
@@ -191,7 +189,6 @@ export default function CodaStampaPage() {
       setStatusChangeTarget(null)
     } catch (err) {
       setStatusError('Errore aggiornamento stato ordine')
-      console.error('Errore aggiornamento stato ordine:', err)
     } finally {
       setStatusChangeLoading(false)
     }
@@ -222,7 +219,6 @@ export default function CodaStampaPage() {
   const findConcatenationOpportunities = async () => {
     if (!isSuperuser) return // Solo superuser può concatenare
     
-    console.log('🔍 Avvio ricerca opportunità di concatenazione...')
     setConcatenationLoading(true)
     try {
       // Usa "AUTO" come criterio per il profilo automatico
@@ -253,30 +249,22 @@ export default function CodaStampaPage() {
     
     try {
       for (const proposal of selectedProposals) {
-        console.log(`🔄 Elaborazione proposta: ${proposal.description}`)
-        
         // Esegui concatenazione per ogni candidato
         for (const candidate of proposal.candidates) {
           const outputFileName = `concatenated_${Date.now()}_${candidate.stampanteId}.gcode.3mf`
           const concatenatedPackage = await executeConcatenation(candidate, outputFileName)
-          console.log('📦 File concatenato creato:', concatenatedPackage)
           
           // Scarica il file concatenato se richiesto
           if (autoDownload) {
             try {
               await downloadGcode3mf(concatenatedPackage, outputFileName)
-              console.log('📥 File concatenato scaricato:', outputFileName)
             } catch (downloadError) {
-              console.error('❌ Errore download file concatenato:', downloadError)
               // Continua comunque con l'aggiornamento della coda
             }
-          } else {
-            console.log('⏭️ Download automatico disabilitato')
           }
           
           // Aggiorna coda con nuovo file (usa il nome del file generato)
           await updateQueueWithConcatenatedFile(candidate, outputFileName)
-          console.log('✅ Coda aggiornata con file concatenato')
         }
       }
       
@@ -291,7 +279,6 @@ export default function CodaStampaPage() {
       )
       
     } catch (err) {
-      console.error('❌ Errore durante concatenazione:', err)
       setError('Errore durante concatenazione')
     }
   }

@@ -3,8 +3,6 @@ import type { Ordine } from '@/types/ordine'
 import { addToCodaStampa, updateCodaStampaStatus, removeFromCodaStampa } from './codaStampa'
 
 export async function listOrders({ organizzazione_id, isSuperuser = false }: { organizzazione_id?: number, isSuperuser?: boolean } = {}): Promise<Ordine[]> {
-  console.log('listOrders chiamato con:', { organizzazione_id, isSuperuser });
-  
   let query = supabase
     .from('ordine')
     .select('*')
@@ -18,11 +16,9 @@ export async function listOrders({ organizzazione_id, isSuperuser = false }: { o
   const { data, error } = await query;
   
   if (error) {
-    console.error('Errore caricamento ordini:', error);
     throw error;
   }
   
-  console.log('Ordini caricati:', data);
   return data || [];
 }
 
@@ -34,8 +30,6 @@ export async function createOrder(
   organizzazione_id?: number,
   user_id?: string
 ): Promise<void> {
-  console.log('createOrder chiamato con:', { gcode_id, quantita, data_consegna, note, organizzazione_id, user_id })
-  
   // Recupera user_id se non passato
   let uid = user_id
   if (!uid) {
@@ -43,7 +37,6 @@ export async function createOrder(
     if (userError || !userData.user) throw userError || new Error('Utente non autenticato')
     uid = userData.user.id
   }
-  console.log('User ID:', uid)
 
   // Recupera commessa_id dal gcode
   const { data: gcode, error: gcodeError } = await supabase
@@ -52,10 +45,8 @@ export async function createOrder(
     .eq('id', gcode_id)
     .single()
   if (gcodeError || !gcode) {
-    console.error('Errore recupero gcode:', gcodeError)
     throw gcodeError || new Error('G-code non trovato')
   }
-  console.log('Gcode trovato:', gcode)
 
   // Recupera commessa_id dal file_origine
   const { data: fileOrigine, error: fileError } = await supabase
@@ -64,10 +55,8 @@ export async function createOrder(
     .eq('id', gcode.file_origine_id)
     .single()
   if (fileError || !fileOrigine) {
-    console.error('Errore recupero file origine:', fileError)
     throw fileError || new Error('File origine non trovato')
   }
-  console.log('File origine trovato:', fileOrigine)
 
   // Recupera organizzazione_id dalla commessa se non passato
   let orgId = organizzazione_id
@@ -78,12 +67,10 @@ export async function createOrder(
       .eq('id', fileOrigine.commessa_id)
       .single()
     if (commessaError || !commessa) {
-      console.error('Errore recupero commessa:', commessaError)
       throw commessaError || new Error('Commessa non trovata')
     }
     orgId = commessa.organizzazione_id
   }
-  console.log('Organizzazione ID:', orgId)
 
   const row: Partial<Ordine> = {
     gcode_id,
@@ -96,7 +83,6 @@ export async function createOrder(
     consegna_richiesta: data_consegna ?? null,
     note: note ?? null,
   }
-  console.log('Row da inserire:', row)
   
   try {
     const { data, error } = await supabase
@@ -105,19 +91,9 @@ export async function createOrder(
       .select()
     
     if (error) {
-      console.error('Errore inserimento ordine:', error)
-      console.error('Dettagli errore:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
-      })
       throw new Error(`Errore inserimento ordine: ${error.message}`)
     }
-    
-    console.log('Ordine creato con successo:', data)
   } catch (err) {
-    console.error('Errore generale inserimento ordine:', err)
     if (err instanceof Error) {
       throw err
     } else {
@@ -130,8 +106,6 @@ export async function updateOrderStatus(
   id: number,
   stato: Ordine['stato']
 ): Promise<void> {
-  console.log(`🔄 Aggiornamento stato ordine #${id} a: ${stato}`)
-  
   const { error } = await supabase
     .from('ordine')
     .update({ stato })
@@ -143,9 +117,7 @@ export async function updateOrderStatus(
   if (stato === 'error') {
     try {
       await duplicateOrder(id)
-      console.log(`🔄 Ordine #${id} messo in errore e duplicato automaticamente`)
     } catch (duplicateError) {
-      console.error('Errore duplicazione ordine dopo errore:', duplicateError)
       // Non blocchiamo l'operazione principale se la duplicazione fallisce
     }
   }
@@ -188,12 +160,10 @@ export async function checkOrdineTableExists(): Promise<boolean> {
       .limit(1)
     
     if (error) {
-      console.error('Errore verifica tabella ordine:', error)
       return false
     }
     return true
   } catch (err) {
-    console.error('Errore verifica tabella ordine:', err)
     return false
   }
 }
@@ -218,7 +188,6 @@ export async function createOrdineTable(): Promise<void> {
   
   const { error } = await supabase.rpc('exec_sql', { sql })
   if (error) {
-    console.error('Errore creazione tabella ordine:', error)
     throw error
   }
 }
@@ -246,7 +215,6 @@ export async function getOrder(id: number): Promise<Ordine | null> {
     .single()
   
   if (error) {
-    console.error('Errore recupero ordine:', error)
     return null
   }
   
@@ -280,10 +248,8 @@ export async function duplicateOrder(originalOrderId: number): Promise<number> {
     .single()
   
   if (error) {
-    console.error('Errore duplicazione ordine:', error)
     throw error
   }
   
-  console.log(`✅ Ordine #${originalOrderId} duplicato come ordine #${data.id}`)
   return data.id
 }

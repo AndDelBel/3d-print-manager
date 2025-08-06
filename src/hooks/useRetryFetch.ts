@@ -34,7 +34,6 @@ export function useRetryFetch(
     intervalRef.current = setInterval(() => {
       if (loading) {
         retryCountRef.current++
-        console.log(`Retry automatico #${retryCountRef.current} - Tentativo di ricaricamento dati...`)
         fetchFunction()
       }
     }, retryInterval)

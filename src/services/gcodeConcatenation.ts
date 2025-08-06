@@ -25,8 +25,6 @@ export interface ConcatenationProposal {
  */
 async function updateGcodesWithoutPrinterInfo(): Promise<void> {
   try {
-    console.log('🔄 Aggiornamento G-code senza informazioni stampante...')
-    
     // Trova G-code senza stampante
     const { data: gcodesWithoutPrinter, error } = await supabase
       .from('gcode')
@@ -35,16 +33,12 @@ async function updateGcodesWithoutPrinterInfo(): Promise<void> {
       .not('nome_file', 'is', null)
     
     if (error) {
-      console.error('❌ Errore ricerca G-code senza stampante:', error)
       return
     }
     
     if (!gcodesWithoutPrinter || gcodesWithoutPrinter.length === 0) {
-      console.log('✅ Tutti i G-code hanno informazioni sulla stampante')
       return
     }
-    
-    console.log(`📦 Trovati ${gcodesWithoutPrinter.length} G-code senza informazioni stampante`)
     
     // Aggiorna i primi 5 G-code per evitare sovraccarico
     const gcodesToUpdate = gcodesWithoutPrinter.slice(0, 5)
@@ -57,7 +51,6 @@ async function updateGcodesWithoutPrinterInfo(): Promise<void> {
           .download(gcode.nome_file)
         
         if (downloadError || !fileData) {
-          console.log(`⚠️ Impossibile scaricare file: ${gcode.nome_file}`)
           continue
         }
         
@@ -77,9 +70,7 @@ async function updateGcodesWithoutPrinterInfo(): Promise<void> {
             .eq('id', gcode.id)
           
           if (updateError) {
-            console.error(`❌ Errore aggiornamento G-code ${gcode.id}:`, updateError)
-          } else {
-            console.log(`✅ G-code ${gcode.id} aggiornato con stampante: ${analysis.stampante}`)
+            // Errore silenzioso
           }
         }
         
@@ -87,12 +78,12 @@ async function updateGcodesWithoutPrinterInfo(): Promise<void> {
         await new Promise(resolve => setTimeout(resolve, 100))
         
       } catch (error) {
-        console.error(`❌ Errore analisi G-code ${gcode.id}:`, error)
+        // Errore silenzioso
       }
     }
     
   } catch (error) {
-    console.error('❌ Errore aggiornamento G-code:', error)
+    // Errore silenzioso
   }
 }
 
@@ -110,21 +101,10 @@ export async function findConcatenationCandidates(
     
     // Carica ordini in coda
     const ordersList = await listOrders({ isSuperuser: true })
-    console.log('📋 Ordini totali caricati:', ordersList.length)
     
     const codaOrders = ordersList.filter(o => ['in_coda', 'in_stampa', 'pronto', 'error'].includes(o.stato))
-    console.log('📋 Ordini in coda filtrati:', codaOrders.length)
-    
-    // Debug: mostra i primi 5 ordini
-    console.log('🔍 Primi 5 ordini in coda:', codaOrders.slice(0, 5).map(o => ({
-      id: o.id,
-      gcode_id: o.gcode_id,
-      stato: o.stato,
-      quantita: o.quantita
-    })))
     
     if (codaOrders.length === 0) {
-      console.log('⚠️ Nessun ordine in coda trovato')
       return []
     }
     
@@ -133,18 +113,10 @@ export async function findConcatenationCandidates(
     const commessaIds = [...new Set(codaOrders.map(o => o.commessa_id))]
     const organizzazioneIds = [...new Set(codaOrders.map(o => o.organizzazione_id))]
     
-    console.log('🔗 ID G-code unici:', gcodeIds.length)
-    console.log('🔗 ID Commesse uniche:', commessaIds.length)
-    console.log('🔗 ID Organizzazioni uniche:', organizzazioneIds.length)
-    
     // Carica gcode, commesse e organizzazioni
     const gcodeList = await listGcode({ file_origine_id: undefined })
     const commesseList = await listCommesse({ isSuperuser: true })
     const organizzazioniList = await listOrg({ isSuperuser: true })
-    
-    console.log('📦 G-code caricati:', gcodeList.length)
-    console.log('📦 Commesse caricate:', commesseList.length)
-    console.log('📦 Organizzazioni caricate:', organizzazioniList.length)
     
     // Crea mappe per lookup veloce
     const gcodeMap = new Map(gcodeList.map(g => [g.id, g]))
@@ -177,7 +149,6 @@ export async function findConcatenationCandidates(
     const proposals: ConcatenationProposal[] = []
     
     // 1. Analizza ordini singoli con quantità > 1 (concatenazione interna)
-    console.log('🔍 Analizzando ordini singoli con quantità > 1...')
     const singleOrderProposals: ConcatenationProposal[] = []
     
     for (const order of codaOrders) {
@@ -186,8 +157,6 @@ export async function findConcatenationCandidates(
         if (!gcode) continue
         
         const printerName = gcode.stampante || 'Unknown Printer'
-        
-        console.log(`  - Ordine ${order.id}: ${order.quantita}x quantità per G-code ${order.gcode_id}`)
         
         const candidate: ConcatenationCandidate = {
           ordineIds: [order.id],
@@ -207,30 +176,20 @@ export async function findConcatenationCandidates(
           estimatedTime: gcode.tempo_stampa_min ? gcode.tempo_stampa_min * order.quantita : 0,
           estimatedMaterial: gcode.peso_grammi ? gcode.peso_grammi * order.quantita : 0
         })
-        
-        console.log(`  ✅ Proposta creata per ordine singolo ${order.id}`)
       }
     }
     
     // Aggiungi le proposte di ordini singoli
     proposals.push(...singleOrderProposals)
-    console.log(`📋 Proposte ordini singoli: ${singleOrderProposals.length}`)
-    
-    if (singleOrderProposals.length === 0) {
-      console.log('ℹ️ Nessun ordine singolo con quantità > 1 trovato')
-    }
     
     // 2. Analizza ogni stampante per concatenazione tra ordini diversi
     for (const [printerName, items] of groupedByPrinter) {
       if (items.length < 2) {
-        console.log(`⚠️ Stampante "${printerName}": solo ${items.length} ordini, insufficienti per concatenazione`)
         continue
       }
       
       // Se la stampante è "Unknown Printer", raggruppa solo per materiale
       if (printerName === 'Unknown Printer') {
-        console.log(`🔍 Analizzando ordini senza stampante specifica (${items.length} ordini)`)
-        
         // Raggruppa per materiale
         const materialGroups = new Map<string, Ordine[]>()
         
@@ -249,8 +208,6 @@ export async function findConcatenationCandidates(
         for (const [materialKey, materialItems] of materialGroups) {
           if (materialItems.length > 1) {
             const totalQuantity = materialItems.reduce((sum, item) => sum + item.quantita, 0)
-            
-            console.log(`  - Materiale ${materialKey}: ${materialItems.length} ordini, quantità totale: ${totalQuantity}`)
             
             if (totalQuantity > 1) {
               const candidate: ConcatenationCandidate = {
@@ -277,16 +234,12 @@ export async function findConcatenationCandidates(
                   return sum + (gcode?.peso_grammi || 0) * item.quantita
                 }, 0)
               })
-              
-              console.log(`  ✅ Proposta creata per materiale ${materialKey} (stampante sconosciuta)`)
             }
           }
         }
         
         continue // Salta l'analisi normale per questa stampante
       }
-      
-      console.log(`🔍 Analizzando stampante "${printerName}" con ${items.length} ordini`)
       
       // Raggruppa per G-code (stesso elemento)
       const sameGcodeGroups = new Map<number, Ordine[]>()
@@ -299,14 +252,10 @@ export async function findConcatenationCandidates(
         sameGcodeGroups.get(gcodeId)!.push(item)
       }
       
-      console.log(`  - G-code unici: ${sameGcodeGroups.size}`)
-      
       // Proponi concatenazione per stesso G-code
       for (const [gcodeId, gcodeItems] of sameGcodeGroups) {
         if (gcodeItems.length > 1) {
           const totalQuantity = gcodeItems.reduce((sum, item) => sum + item.quantita, 0)
-          
-          console.log(`  - G-code ${gcodeId}: ${gcodeItems.length} ordini, quantità totale: ${totalQuantity}`)
           
           if (totalQuantity > 1) {
             const gcode = gcodeMap.get(gcodeId)
@@ -449,10 +398,8 @@ export async function findConcatenationCandidates(
       }
     }
     
-    console.log(`🎯 Proposte totali trovate: ${proposals.length}`)
     return proposals
   } catch (error) {
-    console.error('❌ Errore ricerca candidati concatenazione:', error)
     throw error
   }
 }
@@ -486,7 +433,7 @@ export async function executeConcatenation(
       gcodeQuantities.set(ordine.gcode_id, currentQuantity + ordine.quantita)
     }
     
-    console.log('📊 Quantità per G-code:', Object.fromEntries(gcodeQuantities))
+
     
     // Recupera i file .gcode.3mf reali associati agli ordini
     try {
@@ -536,7 +483,6 @@ export async function executeConcatenation(
       }
       
       const fileSizeMB = modelGcode.length / 1024 / 1024
-      console.log(`📦 G-code ${gcode.id}: ${quantity} quantità richieste, ${quantity} repliche create (file: ${fileSizeMB.toFixed(1)}MB)`)
           
           // Usa il primo file come base per il pacchetto
           if (!baseFile) {
@@ -557,10 +503,8 @@ export async function executeConcatenation(
       
       // Controlla la dimensione totale del contenuto
       const totalSize = allGcodeContents.reduce((sum, content) => sum + content.length, 0)
-      console.log(`📊 Dimensione totale contenuto: ${(totalSize / 1024 / 1024).toFixed(2)} MB`)
       
       if (totalSize > 500 * 1024 * 1024) { // Aumentato a 500MB per gestire file più grandi
-        console.warn('⚠️ Contenuto molto grande, limitando a 500MB')
         // Limita il contenuto mantenendo solo i primi file
         const maxSize = 500 * 1024 * 1024
         let currentSize = 0
@@ -574,7 +518,6 @@ export async function executeConcatenation(
         
         allGcodeContents.length = 0
         allGcodeContents.push(...limitedContents)
-        console.log(`📦 Contenuto limitato a ${limitedContents.length} file (${(currentSize / 1024 / 1024).toFixed(2)} MB)`)
       }
       
       // Usa il primo contenuto come base e gli altri come aggiuntivi
@@ -609,20 +552,8 @@ export async function updateQueueWithConcatenatedFile(
 ): Promise<void> {
   try {
     // Non modifichiamo gli ordini originali - rimangono invariati
-    console.log('✅ File concatenato creato senza modificare gli ordini originali')
-    console.log('📋 Ordini originali rimangono invariati:', candidate.ordineIds)
-    
-    // Log delle informazioni per debug
-    console.log('📊 Informazioni concatenazione:', {
-      ordiniOriginali: candidate.ordineIds,
-      gcodeIds: candidate.gcodeIds,
-      stampante: candidate.stampanteId,
-      quantita: candidate.totalQuantity,
-      materiale: candidate.materialName
-    })
 
   } catch (error) {
-    console.error('❌ Errore durante la concatenazione:', error)
     throw new Error(`Errore durante la concatenazione: ${error}`)
   }
 } 

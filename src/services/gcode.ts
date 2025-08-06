@@ -74,13 +74,10 @@ export async function uploadGcode(
       // Per file .gcode.3mf, estrai anche i metadati
       const { extractGcodeMetadata } = await import('@/utils/gcodeParser')
       gcodeMetadata = await extractGcodeMetadata(file)
-      console.log('Metadati .gcode.3mf estratti:', gcodeMetadata)
     }
     
     gcodeAnalysis = await analyzeGcodeFile(file)
-    console.log('Analisi G-code completata:', gcodeAnalysis)
   } catch (error) {
-    console.warn('Errore nell\'analisi del G-code:', error)
     // Continua senza analisi se fallisce
   }
 
@@ -188,10 +185,7 @@ export async function updateGcodeAnalysis(id: number): Promise<void> {
       .eq('id', id)
     
     if (updateError) throw updateError
-    
-    console.log('Analisi G-code aggiornata per ID:', id, analysis)
   } catch (error) {
-    console.error('Errore nell\'aggiornamento dell\'analisi G-code:', error)
     throw error
   }
 }
@@ -206,22 +200,16 @@ export async function analyzeAllGcodes(): Promise<void> {
     
     if (fetchError) throw fetchError
     
-    console.log(`Analizzando ${gcodes?.length || 0} G-code...`)
-    
     for (const gcode of gcodes || []) {
       try {
         await updateGcodeAnalysis(gcode.id)
         // Pausa per evitare sovraccarico
         await new Promise(resolve => setTimeout(resolve, 100))
       } catch (error) {
-        console.error(`Errore nell'analisi del G-code ${gcode.id}:`, error)
         // Continua con gli altri
       }
     }
-    
-    console.log('Analisi di tutti i G-code completata')
   } catch (error) {
-    console.error('Errore nell\'analisi di tutti i G-code:', error)
     throw error
   }
 } 

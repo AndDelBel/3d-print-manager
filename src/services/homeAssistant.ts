@@ -191,7 +191,6 @@ export async function getSpecificPrinters(uniqueIds: string[]): Promise<PrinterS
     // Verifica che Home Assistant sia configurato
     const haConfig = await getHomeAssistantConfig()
     if (!haConfig || !haConfig.base_url || !haConfig.access_token) {
-      console.log('Home Assistant non configurato')
       return []
     }
 
@@ -201,13 +200,11 @@ export async function getSpecificPrinters(uniqueIds: string[]): Promise<PrinterS
 
     const printers: PrinterState[] = []
 
-    // Per ogni unique_id, costruisci l'entity_id e recupera lo stato
+    // Per ogni unique_id (che ora è il nome dell'entità), recupera lo stato
     for (const uniqueId of uniqueIds) {
       try {
-        // Costruisci l'entity_id basandoti sul pattern conosciuto
-        const entityId = `sensor.${uniqueId}_printer_status`
-        
-        console.log(`Recupero stato per entità: ${entityId}`)
+        // Costruisci l'entity_id usando il nome direttamente
+        const entityId = `sensor.${uniqueId}`
         
         const entity = await getEntityState(entityId)
         
@@ -215,7 +212,7 @@ export async function getSpecificPrinters(uniqueIds: string[]): Promise<PrinterS
         const attributes = entity.attributes || {}
         
         const printerState: PrinterState = {
-          entity_id: entity.entity_id,
+          entity_id: entityId,
           unique_id: uniqueId,
           state: mapEntityStateToPrinterState(entity.state),
           friendly_name: attributes.friendly_name as string | undefined,
@@ -228,13 +225,11 @@ export async function getSpecificPrinters(uniqueIds: string[]): Promise<PrinterS
         }
         
         printers.push(printerState)
-        console.log(`Stato recuperato per ${uniqueId}:`, printerState.state)
         
       } catch (error) {
-        console.error(`Errore nel recupero stato per ${uniqueId}:`, error)
         // Aggiungi una stampante offline se non riesci a recuperare lo stato
         printers.push({
-          entity_id: `sensor.${uniqueId}_printer_status`,
+          entity_id: `sensor.${uniqueId}`,
           unique_id: uniqueId,
           state: 'offline',
           friendly_name: uniqueId,
@@ -250,7 +245,6 @@ export async function getSpecificPrinters(uniqueIds: string[]): Promise<PrinterS
 
     return printers
   } catch (error) {
-    console.error('Errore nel recupero delle stampanti specifiche:', error)
     return []
   }
 }
@@ -261,40 +255,14 @@ export async function getAvailablePrinters(): Promise<PrinterState[]> {
     // Verifica che Home Assistant sia configurato
     const haConfig = await getHomeAssistantConfig()
     if (!haConfig || !haConfig.base_url || !haConfig.access_token) {
-      console.log('Home Assistant non configurato')
       return []
     }
 
     const states = await getStates()
     const printers: PrinterState[] = []
 
-    console.log('Entità trovate in Home Assistant:', Array.isArray(states) ? states.length : Object.keys(states).length)
-    
     // La risposta di Home Assistant è un array di entità, non un oggetto
     const entities = Array.isArray(states) ? states : Object.values(states)
-    
-    // Debug: mostra le entità che potrebbero essere stampanti
-    const potentialPrinters = entities.filter(entity => 
-      entity.entity_id.includes('printer') || 
-      entity.entity_id.includes('x1') || 
-      entity.entity_id.includes('a1') || 
-      entity.entity_id.includes('h2d') || 
-      entity.entity_id.includes('rat_rig')
-    )
-    console.log('Entità potenzialmente stampanti:', potentialPrinters.map(e => e.entity_id))
-    
-    // Debug: mostra le entità che contengono pattern di stampanti
-    const printerEntities = entities.filter(e => 
-      e.entity_id.includes('_printer_status') ||
-      e.entity_id.includes('_printer_state') ||
-      e.entity_id.includes('_3d_printer') ||
-      e.entity_id.includes('rat_rig') ||
-      e.entity_id.includes('x1') ||
-      e.entity_id.includes('a1') ||
-      e.entity_id.includes('h2d') ||
-      e.entity_id.includes('bambu')
-    )
-    console.log('Entità stampanti trovate:', printerEntities.map(e => e.entity_id))
     
     // Cerca i template sensor delle stampanti
     for (const entity of entities) {
@@ -312,8 +280,6 @@ export async function getAvailablePrinters(): Promise<PrinterState[]> {
           entity.entity_id.includes('x1c_') ||
           entity.entity_id.includes('a1_') ||
           entity.entity_id.includes('h2d_')) {
-        
-        console.log('Template sensor stampante trovato:', entity.entity_id, entity.attributes.friendly_name)
         
         // Mappa gli attributi dai template sensor
         const attributes = entity.attributes || {}
@@ -340,7 +306,6 @@ export async function getAvailablePrinters(): Promise<PrinterState[]> {
 
     return printers
   } catch (error) {
-    console.error('Errore nel recupero delle stampanti disponibili:', error)
     return []
   }
 } 

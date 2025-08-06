@@ -400,29 +400,14 @@ export default function OrdersPage() {
                       )}
                     </td>
                     <td>
-                      <LoadingButton
-                        loading={false}
-                        loadingText="Aggiorno…"
-                        className="btn btn-ghost btn-xs"
-                        onClick={e => e.preventDefault()}
-                      >
-                        {isSuperuser ? (
-                          <button
-                            onClick={() => openStatusChangeModal(o)}
-                            className={`badge cursor-pointer hover:opacity-80 ${
-                              o.stato === 'consegnato' ? 'badge-success' :
-                              o.stato === 'pronto' ? 'badge-info' :
-                              o.stato === 'in_stampa' ? 'badge-warning' :
-                              o.stato === 'in_coda' ? 'badge-primary' :
-                              o.stato === 'error' ? 'badge-error' :
-                              'badge-neutral'
-                            }`}
-                            disabled={false}
-                          >
-                            {o.stato}
-                          </button>
-                        ) : (
-                          <span className={`badge ${
+                      {isSuperuser ? (
+                        <LoadingButton
+                          loading={false}
+                          loadingText="Aggiorno…"
+                          className="btn btn-ghost btn-xs"
+                          onClick={() => openStatusChangeModal(o)}
+                        >
+                          <span className={`badge cursor-pointer hover:opacity-80 ${
                             o.stato === 'consegnato' ? 'badge-success' :
                             o.stato === 'pronto' ? 'badge-info' :
                             o.stato === 'in_stampa' ? 'badge-warning' :
@@ -432,8 +417,19 @@ export default function OrdersPage() {
                           }`}>
                             {o.stato}
                           </span>
-                        )}
-                      </LoadingButton>
+                        </LoadingButton>
+                      ) : (
+                        <span className={`badge ${
+                          o.stato === 'consegnato' ? 'badge-success' :
+                          o.stato === 'pronto' ? 'badge-info' :
+                          o.stato === 'in_stampa' ? 'badge-warning' :
+                          o.stato === 'in_coda' ? 'badge-primary' :
+                          o.stato === 'error' ? 'badge-error' :
+                          'badge-neutral'
+                        }`}>
+                          {o.stato}
+                        </span>
+                      )}
                     </td>
                     {isSuperuser && (
                       <td className="text-center">

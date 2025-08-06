@@ -70,7 +70,7 @@ export default function GcodeAnalysisDisplay({ gcode, onRefresh }: GcodeAnalysis
             </div>
             <div>
               <p className="text-sm opacity-70">Tempo di stampa</p>
-              <p className="font-semibold">{formatTime(gcode.tempo_stampa_min)}</p>
+              <p className="font-semibold">{formatTime(gcode.tempo_stampa_min || 0)}</p>
             </div>
           </div>
         </div>
@@ -83,7 +83,7 @@ export default function GcodeAnalysisDisplay({ gcode, onRefresh }: GcodeAnalysis
             </div>
             <div>
               <p className="text-sm opacity-70">Peso materiale</p>
-              <p className="font-semibold">{formatWeight(gcode.peso_grammi)}</p>
+              <p className="font-semibold">{formatWeight(gcode.peso_grammi || 0)}</p>
             </div>
           </div>
         </div>

@@ -101,8 +101,6 @@ export async function uploadFile(
 
 // 2) Lista file per l'utente (RLS fa il resto)
 export async function listFiles(): Promise<FileRecord[]> {
-  console.log('listFiles chiamato');
-  
   // Non serve più filtrare manualmente il tipo: RLS fa il suo lavoro.
   const { data, error } = await supabase
     .from('file')
@@ -110,11 +108,9 @@ export async function listFiles(): Promise<FileRecord[]> {
     .order('data_caricamento', { ascending: false });
   
   if (error) {
-    console.error('Errore caricamento file:', error);
     throw error;
   }
   
-  console.log('File caricati:', data);
   return data || [];
 }
 

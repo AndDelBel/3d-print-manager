@@ -127,22 +127,11 @@ export class GcodeParser {
     // Se è PrusaSlicer, cerca nelle ultime 400 righe, altrimenti nelle prime 50
     const searchLines = isPrusaSlicer ? lines.slice(-400) : lines.slice(0, 50)
     
-    // Debug: mostra le righe di ricerca
-    const debugLines = searchLines.join('\n')
-    console.log(`🔍 Righe di ricerca (${isPrusaSlicer ? 'ultime 400' : 'prime 50'}):`, debugLines)
-    
     for (const line of searchLines) {
       const trimmedLine = line.trim()
       
-      // Debug: mostra tutte le righe che contengono "time" o "TIME"
-      if (trimmedLine.toLowerCase().includes('time')) {
-        console.log('🔍 Riga con "time" trovata:', trimmedLine)
-      }
-      
       // Pattern per BambuStudio: "model printing time: 40m 2s" o "1h 1m 23s" o "1d 2h 30m 15s"
       if (trimmedLine.includes('model printing time:')) {
-        console.log('🔍 Trovata riga model printing time:', trimmedLine)
-        
         // Pattern per formato con giorni: "1d 2h 30m 15s"
         const timeMatchWithDays = trimmedLine.match(/model printing time:\s*(\d+)d\s*(\d+)h\s*(\d+)m\s*(\d+)s/)
         if (timeMatchWithDays) {
@@ -151,7 +140,6 @@ export class GcodeParser {
           const minutes = parseInt(timeMatchWithDays[3])
           const seconds = parseInt(timeMatchWithDays[4])
           const totalMinutes = Math.round((days * 86400 + hours * 3600 + minutes * 60 + seconds) / 60)
-          console.log('⏰ Tempo estratto da model printing time (con giorni):', days, 'd', hours, 'h', minutes, 'm', seconds, 's ->', totalMinutes, 'min')
           return totalMinutes
         }
         
@@ -162,7 +150,6 @@ export class GcodeParser {
           const minutes = parseInt(timeMatchWithHours[2])
           const seconds = parseInt(timeMatchWithHours[3])
           const totalMinutes = Math.round((hours * 3600 + minutes * 60 + seconds) / 60)
-          console.log('⏰ Tempo estratto da model printing time (con ore):', hours, 'h', minutes, 'm', seconds, 's ->', totalMinutes, 'min')
           return totalMinutes
         }
         
@@ -172,17 +159,12 @@ export class GcodeParser {
           const minutes = parseInt(timeMatchWithoutHours[1])
           const seconds = parseInt(timeMatchWithoutHours[2])
           const totalMinutes = Math.round((minutes * 60 + seconds) / 60)
-          console.log('⏰ Tempo estratto da model printing time (senza ore):', minutes, 'm', seconds, 's ->', totalMinutes, 'min')
           return totalMinutes
-          } else {
-          console.log('❌ Pattern model printing time non matchato su:', trimmedLine)
         }
       }
       
       // Pattern per BambuStudio: "total estimated time: 41m 50s" o "1h 3m 11s" o "1d 2h 30m 15s"
       if (trimmedLine.includes('total estimated time:')) {
-        console.log('🔍 Trovata riga total estimated time:', trimmedLine)
-        
         // Pattern per formato con giorni: "1d 2h 30m 15s"
         const timeMatchWithDays = trimmedLine.match(/total estimated time:\s*(\d+)d\s*(\d+)h\s*(\d+)m\s*(\d+)s/)
         if (timeMatchWithDays) {
@@ -191,7 +173,6 @@ export class GcodeParser {
           const minutes = parseInt(timeMatchWithDays[3])
           const seconds = parseInt(timeMatchWithDays[4])
           const totalMinutes = Math.round((days * 86400 + hours * 3600 + minutes * 60 + seconds) / 60)
-          console.log('⏰ Tempo estratto da total estimated time (con giorni):', days, 'd', hours, 'h', minutes, 'm', seconds, 's ->', totalMinutes, 'min')
           return totalMinutes
         }
         
@@ -202,7 +183,6 @@ export class GcodeParser {
           const minutes = parseInt(timeMatchWithHours[2])
           const seconds = parseInt(timeMatchWithHours[3])
           const totalMinutes = Math.round((hours * 3600 + minutes * 60 + seconds) / 60)
-          console.log('⏰ Tempo estratto da total estimated time (con ore):', hours, 'h', minutes, 'm', seconds, 's ->', totalMinutes, 'min')
           return totalMinutes
         }
         
@@ -212,10 +192,7 @@ export class GcodeParser {
           const minutes = parseInt(timeMatchWithoutHours[1])
           const seconds = parseInt(timeMatchWithoutHours[2])
           const totalMinutes = Math.round((minutes * 60 + seconds) / 60)
-          console.log('⏰ Tempo estratto da total estimated time (senza ore):', minutes, 'm', seconds, 's ->', totalMinutes, 'min')
           return totalMinutes
-        } else {
-          console.log('❌ Pattern total estimated time non matchato su:', trimmedLine)
         }
       }
       
@@ -242,7 +219,6 @@ export class GcodeParser {
           const minutes = parseInt(timeMatchWithHours[2])
           const seconds = parseInt(timeMatchWithHours[3])
           const totalMinutes = Math.round((hours * 3600 + minutes * 60 + seconds) / 60)
-          console.log('⏰ Tempo estratto da pattern generico (con ore):', hours, 'h', minutes, 'm', seconds, 's ->', totalMinutes, 'min')
           return totalMinutes
         }
         
@@ -252,47 +228,38 @@ export class GcodeParser {
           const minutes = parseInt(timeMatchWithoutHours[1])
           const seconds = parseInt(timeMatchWithoutHours[2])
           const totalMinutes = Math.round((minutes * 60 + seconds) / 60)
-          console.log('⏰ Tempo estratto da pattern generico (senza ore):', minutes, 'm', seconds, 's ->', totalMinutes, 'min')
           return totalMinutes
         }
       }
       
       // Pattern standard per altri slicer
       if (trimmedLine.includes('TIME:')) {
-        console.log('🔍 Trovata riga TIME:', trimmedLine)
         const timeMatch = trimmedLine.match(/TIME:\s*(\d+)/)
         if (timeMatch) {
           const minutes = parseInt(timeMatch[1])
-          console.log('⏰ Tempo estratto da TIME:', minutes, 'min')
           return minutes
         }
       }
       
       if (trimmedLine.includes('Estimated printing time:')) {
-        console.log('🔍 Trovata riga Estimated printing time:', trimmedLine)
         const timeMatch = trimmedLine.match(/Estimated printing time:\s*(\d+)/)
         if (timeMatch) {
           const minutes = parseInt(timeMatch[1])
-          console.log('⏰ Tempo estratto da Estimated printing time:', minutes, 'min')
           return minutes
         }
       }
       
       // Pattern per PrusaSlicer: "Estimated printing time (normal mode): 1234"
       if (trimmedLine.includes('Estimated printing time (normal mode):')) {
-        console.log('🔍 Trovata riga Estimated printing time (normal mode):', trimmedLine)
         const timeMatch = trimmedLine.match(/Estimated printing time \(normal mode\):\s*(\d+)/)
         if (timeMatch) {
           const minutes = parseInt(timeMatch[1])
-          console.log('⏰ Tempo estratto da Estimated printing time (normal mode):', minutes, 'min')
           return minutes
         }
       }
       
       // Pattern per PrusaSlicer: "estimated printing time (normal mode) = 1d 2h 15m 57s"
       if (trimmedLine.includes('estimated printing time (normal mode) =')) {
-        console.log('🔍 Trovata riga estimated printing time (normal mode) =', trimmedLine)
-        
         // Pattern per formato con giorni: "1d 2h 15m 57s"
         const timeMatchWithDays = trimmedLine.match(/estimated printing time \(normal mode\)\s*=\s*(\d+)d\s*(\d+)h\s*(\d+)m\s*(\d+)s/)
         if (timeMatchWithDays) {
@@ -301,7 +268,6 @@ export class GcodeParser {
           const minutes = parseInt(timeMatchWithDays[3])
           const seconds = parseInt(timeMatchWithDays[4])
           const totalMinutes = Math.round((days * 86400 + hours * 3600 + minutes * 60 + seconds) / 60)
-          console.log('⏰ Tempo estratto da estimated printing time (con giorni):', days, 'd', hours, 'h', minutes, 'm', seconds, 's ->', totalMinutes, 'min')
           return totalMinutes
         }
         
@@ -312,7 +278,6 @@ export class GcodeParser {
           const minutes = parseInt(timeMatchWithHours[2])
           const seconds = parseInt(timeMatchWithHours[3])
           const totalMinutes = Math.round((hours * 3600 + minutes * 60 + seconds) / 60)
-          console.log('⏰ Tempo estratto da estimated printing time (con ore):', hours, 'h', minutes, 'm', seconds, 's ->', totalMinutes, 'min')
           return totalMinutes
         }
         
@@ -322,35 +287,29 @@ export class GcodeParser {
           const minutes = parseInt(timeMatchWithoutHours[1])
           const seconds = parseInt(timeMatchWithoutHours[2])
           const totalMinutes = Math.round((minutes * 60 + seconds) / 60)
-          console.log('⏰ Tempo estratto da estimated printing time (senza ore):', minutes, 'm', seconds, 's ->', totalMinutes, 'min')
           return totalMinutes
         }
       }
       
       // Pattern per PrusaSlicer: "Print time: 1234"
       if (trimmedLine.includes('Print time:')) {
-        console.log('🔍 Trovata riga Print time:', trimmedLine)
         const timeMatch = trimmedLine.match(/Print time:\s*(\d+)/)
         if (timeMatch) {
           const minutes = parseInt(timeMatch[1])
-          console.log('⏰ Tempo estratto da Print time:', minutes, 'min')
           return minutes
         }
       }
       
       // Pattern per PrusaSlicer: "TIME: 1234"
       if (trimmedLine.includes('TIME:')) {
-        console.log('🔍 Trovata riga TIME:', trimmedLine)
         const timeMatch = trimmedLine.match(/TIME:\s*(\d+)/)
         if (timeMatch) {
           const minutes = parseInt(timeMatch[1])
-          console.log('⏰ Tempo estratto da TIME:', minutes, 'min')
           return minutes
         }
       }
     }
 
-    console.log('❌ Nessun pattern tempo trovato, restituendo null')
     return null
   }
 
@@ -413,7 +372,6 @@ export class GcodeParser {
     const volume = this.calculatePrintVolume()
     const density = 1.24 // g/cm³ per PLA
     const estimatedWeight = Math.round(volume * density)
-    console.log('⚖️ Peso stimato da volume:', estimatedWeight, 'g')
     return estimatedWeight
   }
 
@@ -438,7 +396,6 @@ export class GcodeParser {
             // Estrai solo il nome del materiale (es. "PETG" da "PETG Fast-Forward...")
             const materialMatch = firstMaterial.match(/^([A-Z]+)/)
             if (materialMatch) {
-              console.log('🔍 Materiale estratto da filament_settings_id:', materialMatch[1])
               return materialMatch[1]
             }
           }
@@ -493,7 +450,6 @@ export class GcodeParser {
         const printerMatch = trimmedLine.match(/printer_model:\s*(.+)/)
         if (printerMatch) {
           const printerName = printerMatch[1].trim()
-          console.log('🖨️ Stampante estratta da printer_model:', printerName)
           return printerName
         }
       }
@@ -503,7 +459,6 @@ export class GcodeParser {
         const brandMatch = trimmedLine.match(/printer_brand:\s*(.+)/)
         if (brandMatch) {
           const brandName = brandMatch[1].trim()
-          console.log('🖨️ Brand stampante estratto:', brandName)
           return brandName
         }
       }
@@ -924,7 +879,6 @@ async function searchForProfileInfo(zipContent: JSZip, fileNames: string[]): Pro
   // Cerca PRIMA nel file project_settings.config per il nome della stampante
   const projectSettingsFile = zipContent.file('Metadata/project_settings.config')
   if (projectSettingsFile) {
-    console.log('🖨️ Prova a leggere project_settings.config')
     try {
       const content = await projectSettingsFile.async('string')
       
@@ -940,11 +894,10 @@ async function searchForProfileInfo(zipContent: JSZip, fileNames: string[]): Pro
         
         if (printerName) {
           additionalInfo.printer_model = printerName
-          console.log('🖨️ Modello stampante estratto da inherits_group:', printerName)
         }
       }
     } catch (err) {
-      console.log('❌ Errore lettura project_settings.config:', err)
+      // Errore silenzioso
     }
   }
   
@@ -1136,7 +1089,6 @@ export async function extractWeightFromGcode3mf(file: File): Promise<number | nu
       const weightMatch = content.match(/"weight":\s*([0-9.]+)/)
       if (weightMatch) {
         const weight = parseFloat(weightMatch[1])
-        console.log('⚖️ Peso estratto da plate_1.json:', weight, 'g')
         return Math.round(weight)
       }
     }
@@ -1157,7 +1109,6 @@ export async function extractWeightFromGcode3mf(file: File): Promise<number | nu
         const weightMatch = content.match(/weight[:\s]+([0-9.]+)/i)
         if (weightMatch) {
           const weight = parseFloat(weightMatch[1])
-          console.log('⚖️ Peso estratto da', fileName, ':', weight, 'g')
           return Math.round(weight)
         }
       }
@@ -1165,7 +1116,6 @@ export async function extractWeightFromGcode3mf(file: File): Promise<number | nu
     
     return null
   } catch (error) {
-    console.error('Errore nell\'estrazione del peso da .gcode.3mf:', error)
     return null
   }
 } 
@@ -1188,7 +1138,6 @@ export async function extractPrintTimeFromGcode3mf(file: File): Promise<number |
       if (timeMatch) {
         const timeSeconds = parseFloat(timeMatch[1])
         const timeMinutes = Math.round(timeSeconds / 60)
-        console.log('⏰ Tempo estratto da plate_1.json:', timeSeconds, 's ->', timeMinutes, 'min')
         return timeMinutes
       }
     }
@@ -1210,7 +1159,6 @@ export async function extractPrintTimeFromGcode3mf(file: File): Promise<number |
         if (timeMatch) {
           const timeSeconds = parseFloat(timeMatch[2])
           const timeMinutes = Math.round(timeSeconds / 60)
-          console.log('⏰ Tempo estratto da', fileName, ':', timeSeconds, 's ->', timeMinutes, 'min')
           return timeMinutes
         }
       }
@@ -1218,7 +1166,6 @@ export async function extractPrintTimeFromGcode3mf(file: File): Promise<number |
     
     return null
   } catch (error) {
-    console.error('Errore nell\'estrazione del tempo da .gcode.3mf:', error)
     return null
   }
 } 

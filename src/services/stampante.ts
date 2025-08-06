@@ -2,8 +2,6 @@ import { supabase } from '@/lib/supabaseClient'
 import type { Stampante, CreateStampante, UpdateStampante, ListStampantiParams, StampanteData } from '@/types/stampante'
 
 export async function listStampanti(params: ListStampantiParams): Promise<Stampante[]> {
-  console.log('listStampanti chiamato con:', params)
-  
   let query = supabase
     .from('stampanti')
     .select('*')
@@ -15,11 +13,9 @@ export async function listStampanti(params: ListStampantiParams): Promise<Stampa
   const { data, error } = await query
 
   if (error) {
-    console.error('Errore nel recupero stampanti:', error)
     throw error
   }
 
-  console.log('Stampanti caricate:', data)
   return data || []
 }
 
@@ -141,7 +137,7 @@ export async function getAllStampantiData(params: ListStampantiParams): Promise<
         stampantiData.push(data)
       }
     } catch (error) {
-      console.error(`Errore nel recupero dati stampante ${stampante.id}:`, error)
+      // Errore silenzioso per non interrompere il caricamento delle altre stampanti
     }
   }
 

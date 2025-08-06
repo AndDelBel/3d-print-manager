@@ -9,8 +9,6 @@ function cleanName(str: string): string {
 }
 
 export async function listFileOrigine({ commessa_id, organizzazione_id, isSuperuser = false }: { commessa_id?: number, organizzazione_id?: number, isSuperuser?: boolean }): Promise<FileOrigine[]> {
-  console.log('listFileOrigine chiamato con:', { commessa_id, organizzazione_id, isSuperuser });
-  
   let query = supabase
     .from('file_origine')
     .select('*')
@@ -24,11 +22,9 @@ export async function listFileOrigine({ commessa_id, organizzazione_id, isSuperu
   const { data, error } = await query;
   
   if (error) {
-    console.error('Errore caricamento file origine:', error);
     throw error;
   }
   
-  console.log('File origine caricati:', data);
   return data || [];
 }
 
@@ -96,7 +92,6 @@ export async function uploadFileOrigine(
       tipo: ext === 'stl' ? 'stl' : 'step',
       data_caricamento: new Date().toISOString(),
     }])
-  console.log('uploadFileOrigine', { commessa_id, userId, storageKey, ext, descrizione });
   if (dbErr) throw dbErr
 }
 

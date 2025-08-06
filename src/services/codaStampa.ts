@@ -144,9 +144,7 @@ export async function updateCodaStampaStatus(
     try {
       const { duplicateOrder } = await import('@/services/ordine')
       await duplicateOrder(id)
-      console.log(`🔄 Ordine #${id} messo in errore e duplicato automaticamente`)
     } catch (duplicateError) {
-      console.error('Errore duplicazione ordine dopo errore:', duplicateError)
       // Non blocchiamo l'operazione principale se la duplicazione fallisce
     }
   }
@@ -172,7 +170,6 @@ export async function getNextInQueue(stampante_id: number): Promise<OrdineInCoda
     .single()
   
   if (stampanteError || !stampante) {
-    console.error('Errore recupero stampante:', stampanteError)
     return null
   }
 
@@ -236,7 +233,6 @@ export async function getStampanteNameByGcodeId(gcode_id: number): Promise<strin
       .single()
 
     if (error) {
-      console.error('Errore recupero stampante:', error)
       return null
     }
 

@@ -2,8 +2,6 @@ import { supabase } from '@/lib/supabaseClient'
 import type { Commessa } from '@/types/commessa'
 
 export async function listCommesse({ organizzazione_id, isSuperuser = false }: { organizzazione_id?: number, isSuperuser?: boolean }): Promise<Commessa[]> {
-  console.log('listCommesse chiamato con:', { organizzazione_id, isSuperuser });
-  
   let query = supabase
     .from('commessa')
     .select('*')
@@ -17,11 +15,9 @@ export async function listCommesse({ organizzazione_id, isSuperuser = false }: {
   const { data, error } = await query;
   
   if (error) {
-    console.error('Errore caricamento commesse:', error);
     throw error;
   }
   
-  console.log('Commesse caricate:', data);
   return data || [];
 }
 
