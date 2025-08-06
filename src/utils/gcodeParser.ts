@@ -37,7 +37,7 @@ export interface GcodeAnalysis {
 export interface ConcatenationCandidate {
   ordineIds: number[]
   gcodeIds: number[]
-  stampanteId: number
+  stampanteId: string
   materialName: string
   printSettingsName: string
   totalQuantity: number
