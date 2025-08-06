@@ -1,7 +1,7 @@
 // src/app/dashboard/orders/create/page.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUser } from '@/hooks/useUser'
 import { listGcode } from '@/services/gcode'
@@ -10,7 +10,7 @@ import { CascadingFilters } from '@/components/CascadingFilters'
 import { AlertMessage } from '@/components/AlertMessage'
 import { LoadingButton } from '@/components/LoadingButton'
 
-export default function CreateOrderPage() {
+function CreateOrderContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { loading, user } = useUser()
@@ -213,5 +213,17 @@ export default function CreateOrderPage() {
         </LoadingButton>
       </form>
     </div>
+  )
+}
+
+export default function CreateOrderPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center items-center min-h-[400px]">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    }>
+      <CreateOrderContent />
+    </Suspense>
   )
 }
