@@ -27,6 +27,11 @@ export interface GcodeAnalysis {
   printerModel: string
   errors: string[]
   warnings: string[]
+  // Proprietà aggiuntive per compatibilità con il database
+  peso_grammi?: number
+  tempo_stampa_min?: number
+  materiale?: string
+  stampante?: string
 }
 
 export interface ConcatenationCandidate {
@@ -247,13 +252,19 @@ export async function analyzeGcodeFile(file: File): Promise<GcodeAnalysis> {
       // Tempo di stampa
       if (trimmedLine.includes(';TIME:')) {
         const match = line.match(/;TIME:(\d+)/)
-        if (match) analysis.printTime = parseInt(match[1])
+        if (match) {
+          analysis.printTime = parseInt(match[1])
+          analysis.tempo_stampa_min = Math.ceil(analysis.printTime / 60)
+        }
       }
       
       // Filamento utilizzato
       if (trimmedLine.includes(';FILAMENT_USED:')) {
         const match = line.match(/;FILAMENT_USED:([\d.]+)/)
-        if (match) analysis.filamentUsed = parseFloat(match[1])
+        if (match) {
+          analysis.filamentUsed = parseFloat(match[1])
+          analysis.peso_grammi = Math.round(analysis.filamentUsed)
+        }
       }
       
       // Altezza layer
@@ -289,13 +300,19 @@ export async function analyzeGcodeFile(file: File): Promise<GcodeAnalysis> {
       // Modello stampante
       if (trimmedLine.includes(';PRINTER_MODEL:')) {
         const match = line.match(/;PRINTER_MODEL:([^;]+)/)
-        if (match) analysis.printerModel = match[1].trim()
+        if (match) {
+          analysis.printerModel = match[1].trim()
+          analysis.stampante = match[1].trim()
+        }
       }
       
       // Tipo materiale
       if (trimmedLine.includes(';MATERIAL:')) {
         const match = line.match(/;MATERIAL:([^;]+)/)
-        if (match) analysis.materialType = match[1].trim()
+        if (match) {
+          analysis.materialType = match[1].trim()
+          analysis.materiale = match[1].trim()
+        }
       }
     }
 
