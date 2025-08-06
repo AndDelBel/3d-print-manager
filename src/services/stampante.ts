@@ -27,7 +27,7 @@ export async function getStampante(id: number): Promise<Stampante | null> {
     .single()
 
   if (error) throw error
-  return data
+  return data 
 }
 
 export async function createStampante(stampante: CreateStampante): Promise<Stampante> {
@@ -38,9 +38,16 @@ export async function createStampante(stampante: CreateStampante): Promise<Stamp
   if (!data.success) {
     throw new Error('Errore nel recupero stampanti da Home Assistant')
   }
-  
-  const printerExists = data.printers.find((p: any) => p.unique_id === stampante.unique_id)
-  
+
+  interface HomeAssistantPrinter {
+    unique_id: string
+    // aggiungi altri campi se necessario
+  }
+
+  const printerExists = (data.printers as HomeAssistantPrinter[]).find(
+    (p) => p.unique_id === stampante.unique_id
+  )
+
   if (!printerExists) {
     throw new Error('Stampante non trovata in Home Assistant')
   }
@@ -103,9 +110,9 @@ export async function getStampanteData(id: number): Promise<StampanteData | null
   if (!data.success) {
     return null
   }
-  
-  const printerData = data.printers.find((p: any) => p.unique_id === stampante.unique_id)
-  
+
+  const printerData = data.printers.find((p: { unique_id: string }) => p.unique_id === stampante.unique_id)
+
   if (!printerData) {
     return null
   }
