@@ -13,6 +13,22 @@ export interface GcodeMetadata {
   [key: string]: string | undefined
 }
 
+export interface GcodeAnalysis {
+  totalLines: number
+  printTime: number
+  filamentUsed: number
+  layerHeight: number
+  infillDensity: number
+  printSpeed: number
+  temperature: number
+  bedTemperature: number
+  estimatedTime: string
+  materialType: string
+  printerModel: string
+  errors: string[]
+  warnings: string[]
+}
+
 export interface ConcatenationCandidate {
   ordineIds: number[]
   gcodeIds: number[]
@@ -198,6 +214,103 @@ export async function extractGcodeMetadata(file: File): Promise<GcodeMetadata> {
     console.error('❌ Errore estrazione metadati:', error)
     throw new Error(`Impossibile estrarre metadati dal file .gcode.3mf: ${error}`)
   }
+}
+
+/**
+ * Analizza un file G-code per estrarre informazioni
+ */
+export async function analyzeGcodeFile(file: File): Promise<GcodeAnalysis> {
+  const analysis: GcodeAnalysis = {
+    totalLines: 0,
+    printTime: 0,
+    filamentUsed: 0,
+    layerHeight: 0,
+    infillDensity: 0,
+    printSpeed: 0,
+    temperature: 0,
+    bedTemperature: 0,
+    estimatedTime: '',
+    materialType: '',
+    printerModel: '',
+    errors: [],
+    warnings: []
+  }
+
+  try {
+    const text = await file.text()
+    const lines = text.split('\n')
+    analysis.totalLines = lines.length
+
+    for (const line of lines) {
+      const trimmedLine = line.trim().toUpperCase()
+      
+      // Tempo di stampa
+      if (trimmedLine.includes(';TIME:')) {
+        const match = line.match(/;TIME:(\d+)/)
+        if (match) analysis.printTime = parseInt(match[1])
+      }
+      
+      // Filamento utilizzato
+      if (trimmedLine.includes(';FILAMENT_USED:')) {
+        const match = line.match(/;FILAMENT_USED:([\d.]+)/)
+        if (match) analysis.filamentUsed = parseFloat(match[1])
+      }
+      
+      // Altezza layer
+      if (trimmedLine.includes(';LAYER_HEIGHT:')) {
+        const match = line.match(/;LAYER_HEIGHT:([\d.]+)/)
+        if (match) analysis.layerHeight = parseFloat(match[1])
+      }
+      
+      // Densità infill
+      if (trimmedLine.includes(';INFILL_DENSITY:')) {
+        const match = line.match(/;INFILL_DENSITY:([\d.]+)/)
+        if (match) analysis.infillDensity = parseFloat(match[1])
+      }
+      
+      // Velocità stampa
+      if (trimmedLine.includes(';PRINT_SPEED:')) {
+        const match = line.match(/;PRINT_SPEED:([\d.]+)/)
+        if (match) analysis.printSpeed = parseFloat(match[1])
+      }
+      
+      // Temperatura
+      if (trimmedLine.includes('M104') || trimmedLine.includes('M109')) {
+        const match = line.match(/S(\d+)/)
+        if (match) analysis.temperature = parseInt(match[1])
+      }
+      
+      // Temperatura piatto
+      if (trimmedLine.includes('M140') || trimmedLine.includes('M190')) {
+        const match = line.match(/S(\d+)/)
+        if (match) analysis.bedTemperature = parseInt(match[1])
+      }
+      
+      // Modello stampante
+      if (trimmedLine.includes(';PRINTER_MODEL:')) {
+        const match = line.match(/;PRINTER_MODEL:([^;]+)/)
+        if (match) analysis.printerModel = match[1].trim()
+      }
+      
+      // Tipo materiale
+      if (trimmedLine.includes(';MATERIAL:')) {
+        const match = line.match(/;MATERIAL:([^;]+)/)
+        if (match) analysis.materialType = match[1].trim()
+      }
+    }
+
+    // Calcola tempo stimato
+    if (analysis.printTime > 0) {
+      const hours = Math.floor(analysis.printTime / 3600)
+      const minutes = Math.floor((analysis.printTime % 3600) / 60)
+      analysis.estimatedTime = `${hours}h ${minutes}m`
+    }
+
+  } catch (error) {
+    analysis.errors.push(`Errore analisi file: ${error}`)
+  }
+
+  return analysis
 }
 
 /**

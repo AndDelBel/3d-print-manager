@@ -3,30 +3,31 @@ import { updateGcodeAnalysis } from '@/services/gcode'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id)
+    const { id } = await params
+    const gcodeId = parseInt(id)
     
-    if (isNaN(id)) {
+    if (isNaN(gcodeId)) {
       return NextResponse.json(
         { success: false, error: 'ID G-code non valido' },
         { status: 400 }
       )
     }
 
-    console.log(`🔄 Avvio analisi del G-code ID: ${id}`)
+    console.log(`🔄 Avvio analisi del G-code ID: ${gcodeId}`)
     
-    await updateGcodeAnalysis(id)
+    await updateGcodeAnalysis(gcodeId)
     
-    console.log(`✅ Analisi del G-code ID: ${id} completata`)
+    console.log(`✅ Analisi del G-code ID: ${gcodeId} completata`)
     
     return NextResponse.json({ 
       success: true, 
-      message: `Analisi del G-code ID: ${id} completata con successo` 
+      message: `Analisi del G-code ID: ${gcodeId} completata con successo` 
     })
   } catch (error) {
-    console.error(`❌ Errore nell'analisi del G-code ID: ${params.id}:`, error)
+    console.error(`❌ Errore nell'analisi del G-code:`, error)
     return NextResponse.json(
       { 
         success: false, 
