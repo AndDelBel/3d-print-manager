@@ -3,18 +3,20 @@ import { getStampanteData } from '@/services/stampante'
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id)
-    if (isNaN(id)) {
+    const { id } = await params
+    const stampanteId = parseInt(id)
+    
+    if (isNaN(stampanteId)) {
       return NextResponse.json(
         { success: false, error: 'ID non valido' },
         { status: 400 }
       )
     }
 
-    const stampanteData = await getStampanteData(id)
+    const stampanteData = await getStampanteData(stampanteId)
     
     if (!stampanteData) {
       return NextResponse.json(
