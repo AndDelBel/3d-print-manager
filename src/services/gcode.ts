@@ -101,6 +101,12 @@ export async function uploadGcode(
 
   // Aggiungi i dati analizzati se disponibili
   if (gcodeAnalysis) {
+    console.log('🔍 [UPLOAD] Dati analisi da salvare:', {
+      peso_grammi: gcodeAnalysis.peso_grammi,
+      tempo_stampa_min: gcodeAnalysis.tempo_stampa_min,
+      materiale: gcodeAnalysis.materiale,
+      stampante: gcodeAnalysis.stampante
+    })
     gcodeData.peso_grammi = gcodeAnalysis.peso_grammi
     gcodeData.tempo_stampa_min = gcodeAnalysis.tempo_stampa_min || undefined
     gcodeData.materiale = gcodeAnalysis.materiale
@@ -109,9 +115,15 @@ export async function uploadGcode(
 
   // Aggiungi metadati specifici per .gcode.3mf se disponibili
   if (gcodeMetadata) {
+    console.log('🔍 [UPLOAD] Metadati .gcode.3mf:', gcodeMetadata)
     // Estrai informazioni utili dai metadati
     if (gcodeMetadata.material_name) {
       gcodeData.materiale = gcodeMetadata.material_name
+      console.log('✅ [UPLOAD] Materiale da metadati:', gcodeMetadata.material_name)
+    }
+    if (gcodeMetadata.printer_model) {
+      gcodeData.stampante = gcodeMetadata.printer_model
+      console.log('✅ [UPLOAD] Stampante da metadati:', gcodeMetadata.printer_model)
     }
     // I metadati vengono salvati nelle note per riferimento futuro
     if (gcodeMetadata.print_settings_name || gcodeMetadata.printer_model) {
@@ -123,10 +135,15 @@ export async function uploadGcode(
   }
 
   // Insert DB
+  console.log('🔍 [UPLOAD] Dati finali da inserire nel DB:', gcodeData)
   const { error: dbErr } = await supabase
     .from('gcode')
     .insert([gcodeData])
-  if (dbErr) throw dbErr
+  if (dbErr) {
+    console.log('❌ [UPLOAD] Errore inserimento DB:', dbErr)
+    throw dbErr
+  }
+  console.log('✅ [UPLOAD] G-code salvato nel DB con successo')
 }
 
 export async function deleteGcode(id: number): Promise<void> {
