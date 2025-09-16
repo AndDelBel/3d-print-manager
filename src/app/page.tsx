@@ -65,15 +65,16 @@ export default function HomePage() {
           </div>
         </Link>
         
-        <Link href="/dashboard/coda-stampa" className="card bg-base-200 hover:bg-base-300 transition-colors">
-          <div className="card-body">
-            <h3 className="card-title text-base-content">Coda Stampa</h3>
-            <p className="text-base-content/70">Monitora la coda di stampa</p>
-          </div>
-        </Link>
+        
         
         {user.is_superuser && (
           <>
+          <Link href="/dashboard/coda-stampa" className="card bg-base-200 hover:bg-base-300 transition-colors">
+            <div className="card-body">
+              <h3 className="card-title text-base-content">Coda Stampa</h3>
+              <p className="text-base-content/70">Monitora la coda di stampa</p>
+            </div>
+          </Link>
             <Link href="/dashboard/organization" className="card bg-base-200 hover:bg-base-300 transition-colors">
               <div className="card-body">
                 <h3 className="card-title text-base-content">Organizzazioni</h3>

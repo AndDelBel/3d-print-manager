@@ -12,9 +12,28 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
-    if (authError) setError(authError.message)
-    else router.push('/dashboard/organization')
+    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
+    if (authError) {
+      setError(authError.message)
+      return
+    }
+
+    // Aggiorna/crea record tabella utente dopo login, così email/nome/cognome sono coerenti
+    try {
+      const user = data.user
+      if (user?.id) {
+        const metadata = user.user_metadata as Record<string, unknown> | undefined
+        const nome = typeof metadata?.nome === 'string' ? metadata.nome : null
+        const cognome = typeof metadata?.cognome === 'string' ? metadata.cognome : null
+        await supabase
+          .from('utente')
+          .upsert({ id: user.id, email: user.email ?? null, nome, cognome }, { onConflict: 'id' })
+      }
+    } catch (e) {
+      console.error('Aggiornamento utente post-login fallito:', e)
+    }
+
+    router.push('/')
   }
 
   return (

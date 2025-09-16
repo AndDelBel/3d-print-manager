@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabaseClient'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // Verifica sessione
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
@@ -21,18 +21,30 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Verifica utente nel database
+    // Verifica/crea utente nel database (idempotente)
+    const metadata = session.user.user_metadata as Record<string, unknown> | undefined
+    const upsertPayload = {
+      id: session.user.id,
+      email: session.user.email,
+      nome: typeof metadata?.nome === 'string' ? metadata.nome : null,
+      cognome: typeof metadata?.cognome === 'string' ? metadata.cognome : null,
+    }
+
+    await supabase
+      .from('utente')
+      .upsert(upsertPayload, { onConflict: 'id' })
+
     const { data: userData, error: userError } = await supabase
       .from('utente')
       .select('*')
       .eq('id', session.user.id)
-      .single()
+      .maybeSingle()
 
-    if (userError) {
+    if (userError || !userData) {
       return NextResponse.json({ 
         authenticated: false, 
         error: 'Utente non trovato nel database',
-        details: userError.message 
+        details: userError?.message 
       })
     }
 

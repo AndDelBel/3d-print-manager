@@ -30,8 +30,17 @@ export function useUser() {
           .eq('id', session.user.id)
           .single()
         
-        if (userError) {
-          setUser(null)
+        if (userError || !data) {
+          // Fallback a dati minimi dall'Auth se la tabella utente non è accessibile
+          const meta = session.user.user_metadata as Record<string, unknown> | undefined
+          setUser({
+            id: session.user.id,
+            email: session.user.email || '',
+            nome: typeof meta?.nome === 'string' ? meta.nome : '',
+            cognome: typeof meta?.cognome === 'string' ? meta.cognome : '',
+            created_at: new Date().toISOString(),
+            is_superuser: false,
+          })
         } else {
           setUser(data as Utente)
         }
@@ -46,7 +55,7 @@ export function useUser() {
 
   // Retry automatico ogni 10 secondi quando in loading
   useRetryFetch(loading, fetchUser, {
-    retryInterval: 10000,
+    retryInterval: 500,
     enabled: true
   })
 
@@ -66,8 +75,16 @@ export function useUser() {
           .eq('id', session.user.id)
           .single()
         
-        if (error) {
-          setUser(null)
+        if (error || !data) {
+          const meta = session.user.user_metadata as Record<string, unknown> | undefined
+          setUser({
+            id: session.user.id,
+            email: session.user.email || '',
+            nome: typeof meta?.nome === 'string' ? meta.nome : '',
+            cognome: typeof meta?.cognome === 'string' ? meta.cognome : '',
+            created_at: new Date().toISOString(),
+            is_superuser: false,
+          })
         } else {
           setUser(data as Utente)
         }

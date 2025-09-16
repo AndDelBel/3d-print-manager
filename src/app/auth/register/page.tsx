@@ -14,18 +14,36 @@ export default function RegisterPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
-    // 1) crea account in auth
+    // 1) crea account in auth passando i metadati (nome, cognome)
     const { data, error: authError } = await supabase.auth.signUp({
-      email, password
+      email,
+      password,
+      options: {
+        data: { nome, cognome }
+      }
     })
     if (authError) {
       setError(authError.message)
       return
     }
-    // 2) crea record in public.utente
-    await supabase
-      .from('utente')
-      .insert([{ id: data.user!.id, email, nome, cognome }])
+    // 2) Prova a creare/aggiornare il record in public.utente
+    // Nota: se la conferma email è attiva, data.user può essere null → in quel caso
+    // il record verrà creato automaticamente dal trigger lato DB (se configurato)
+    try {
+      if (data.user?.id) {
+        const { error: utenteError } = await supabase
+          .from('utente')
+          .upsert({ id: data.user.id, email, nome, cognome }, { onConflict: 'id' })
+
+        if (utenteError) {
+          // Non bloccare la registrazione: mostra l'errore ma prosegui
+          console.error('Errore creazione utente (tabella utente):', utenteError)
+        }
+      }
+    } catch (e) {
+      console.error('Eccezione creazione utente (tabella utente):', e)
+    }
+
     router.push('/auth/login')
   }
 
