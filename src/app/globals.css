@@ -20,6 +20,50 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Mobile table scrolling improvements */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar for better mobile experience */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #9ca3af #e5e7eb;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  height: 8px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: #e5e7eb;
+  border-radius: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border-radius: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Modal z-index fixes */
+.modal {
+  z-index: 50;
+}
+
+.modal-backdrop {
+  z-index: 40;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-box {
+  z-index: 60;
+}
+
 a {
   color: inherit;
   text-decoration: none;

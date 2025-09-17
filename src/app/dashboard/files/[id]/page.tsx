@@ -305,8 +305,9 @@ export default function FileDetailPage() {
             {orders.length === 0 ? (
               <p className="text-base-content/70">Nessun ordine associato a questo file.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="table table-zebra w-full">
+              <div className="w-full">
+                <div className="overflow-x-auto">
+                  <table className="table table-zebra w-full min-w-[600px]">
                   <thead>
                     <tr>
                       <th>ID</th>
@@ -389,6 +390,7 @@ export default function FileDetailPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
           </div>

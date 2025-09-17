@@ -124,7 +124,11 @@ export function FileTable<T extends FileItem>({
       </div>
 
       {/* Tabella */}
-      <table className="w-full table-auto border-collapse">
+      <div className="w-full">
+        {/* Desktop Table View */}
+        <div className="hidden md:block">
+          <div className="overflow-x-auto overscroll-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200">
+            <table className="w-full table-auto border-collapse min-w-[700px]">
         <thead>
           <tr>
             <th className="border px-4 py-2">File</th>
@@ -220,6 +224,99 @@ export function FileTable<T extends FileItem>({
           })}
         </tbody>
       </table>
+          </div>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden space-y-4">
+          {filtered.map(i => {
+            const path = getPath(i)
+            const [org, comm] = path.split('/')
+            const gcodeList = gcodeMap.get(i.id)
+            
+            return (
+              <div key={i.id} className="card bg-base-100 shadow-xl border border-base-300">
+                <div className="card-body p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="card-title text-lg truncate">{parseDisplayName(path)}</h3>
+                    {onStatusChange && (
+                      <div className="badge badge-outline">
+                        {i.is_superato ? 'Superato' : 'Attivo'}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="font-medium">Commessa:</span>
+                      <span className="text-right">{comm}</span>
+                    </div>
+                    
+                    <div className="flex justify-between">
+                      <span className="font-medium">Organizzazione:</span>
+                      <span className="text-right">{org}</span>
+                    </div>
+                    
+                    {isAdmin && gcodeList && Array.isArray(gcodeList) && gcodeList.length > 0 && (
+                      <div className="flex justify-between">
+                        <span className="font-medium">G-code:</span>
+                        <div className="text-right">
+                          {gcodeList.map(g => (
+                            <div key={g.id} className="mb-1">
+                              <button
+                                onClick={() => onDownload(g.nome_file)}
+                                className="btn btn-xs btn-primary"
+                                disabled={gcodeLoading}
+                              >
+                                {gcodeLoading ? 'Scarico...' : 'Scarica'}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="card-actions justify-end mt-4">
+                    {onAssociate && (
+                      <button
+                        className="btn btn-sm btn-primary"
+                        onClick={() => onAssociate(i)}
+                      >
+                        Associa
+                      </button>
+                    )}
+                    {onModifyAssociation && (
+                      <button
+                        className="btn btn-sm btn-outline"
+                        onClick={() => onModifyAssociation(i)}
+                      >
+                        Modifica
+                      </button>
+                    )}
+                    {onStatusChange && !i.is_superato && onMarkSuperato && (
+                      <button
+                        onClick={() => onMarkSuperato(i)}
+                        className="btn btn-sm btn-warning"
+                      >
+                        Rendi superato
+                      </button>
+                    )}
+                    {isAdmin && i.is_superato && onDelete && (
+                      <button
+                        onClick={() => onDelete(i)}
+                        className="btn btn-sm btn-error"
+                      >
+                        Elimina
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }

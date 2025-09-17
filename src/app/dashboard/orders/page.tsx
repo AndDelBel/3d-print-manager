@@ -127,7 +127,7 @@ export default function OrdersPage() {
 
   const getGcodeName = (gcodeId: number) => {
     const gcode = gcodes.get(gcodeId)
-    return gcode ? gcode.nome_file.split('/').pop() || gcode.nome_file : `G-code ${gcodeId}`
+    return gcode ? (gcode.nome_file ? gcode.nome_file.split('/').pop() || gcode.nome_file : `G-code ${gcodeId}`) : `G-code ${gcodeId}`
   }
 
   const getFileOrigine = (gcodeId: number) => {
@@ -165,7 +165,7 @@ export default function OrdersPage() {
         o => String(o.id), 
         o => {
           const file = getFileOrigine(o.gcode_id)
-          return file ? file.nome_file.split('/').pop() || file.nome_file : ''
+          return file ? (file.nome_file ? file.nome_file.split('/').pop() || file.nome_file : '') : ''
         }
       ]
     ),
@@ -351,20 +351,23 @@ export default function OrdersPage() {
       {filtered.length === 0 ? (
         <p className="text-base-content/70">Nessun ordine trovato.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="table table-zebra w-full">
+        <>
+          {/* Desktop Table View */}
+          <div className="hidden md:block w-full">
+            <div className="overflow-x-auto overscroll-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200">
+              <table className="table table-zebra w-full min-w-[800px]">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>File</th>
-                <th>Commessa</th>
-                {(isSuperuser || orgs.length > 1) && <th>Organizzazione</th>}
-                <th>Quantità</th>
-                <th>Data Ordine</th>
-                <th>Consegna richiesta</th>
-                <th>Note</th>
-                <th>Stato</th>
-                {isSuperuser && <th>Azioni</th>}
+                <th className="whitespace-nowrap">ID</th>
+                <th className="whitespace-nowrap">File</th>
+                <th className="whitespace-nowrap">Commessa</th>
+                {(isSuperuser || orgs.length > 1) && <th className="whitespace-nowrap">Organizzazione</th>}
+                <th className="whitespace-nowrap">Quantità</th>
+                <th className="whitespace-nowrap">Data Ordine</th>
+                <th className="whitespace-nowrap">Consegna richiesta</th>
+                <th className="whitespace-nowrap">Note</th>
+                <th className="whitespace-nowrap">Stato</th>
+                {isSuperuser && <th className="whitespace-nowrap">Azioni</th>}
               </tr>
             </thead>
             <tbody>
@@ -379,7 +382,7 @@ export default function OrdersPage() {
                           href={`/dashboard/files/${file.id}`}
                           className="link link-primary"
                         >
-                          {file.nome_file.split('/').pop() || file.nome_file}
+                          {file.nome_file ? file.nome_file.split('/').pop() || file.nome_file : 'N/A'}
                         </a>
                       ) : (
                         <span className="text-base-content/50">-</span>
@@ -452,7 +455,105 @@ export default function OrdersPage() {
               })}
             </tbody>
           </table>
-        </div>
+            </div>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden space-y-4">
+            {filtered.map(o => {
+              const file = getFileOrigine(o.gcode_id)
+              return (
+                <div key={o.id} className="card bg-base-100 shadow-xl border border-base-300">
+                  <div className="card-body p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="card-title text-lg">Ordine #{o.id}</h3>
+                      <div className="flex-shrink-0">
+                        {getStatusBadge(o.stato)}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="font-medium">File:</span>
+                        <span className="text-right">
+                          {file ? (
+                            <a
+                              href={`/dashboard/files/${file.id}`}
+                              className="link link-primary text-xs"
+                            >
+                              {file.nome_file ? file.nome_file.split('/').pop() || file.nome_file : 'N/A'}
+                            </a>
+                          ) : (
+                            <span className="text-base-content/50">-</span>
+                          )}
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between">
+                        <span className="font-medium">Commessa:</span>
+                        <span>{getCommessaName(o.commessa_id)}</span>
+                      </div>
+                      
+                      {(isSuperuser || orgs.length > 1) && (
+                        <div className="flex justify-between">
+                          <span className="font-medium">Organizzazione:</span>
+                          <span>{getOrgName(o.organizzazione_id)}</span>
+                        </div>
+                      )}
+                      
+                      <div className="flex justify-between">
+                        <span className="font-medium">Quantità:</span>
+                        <span>{o.quantita}</span>
+                      </div>
+                      
+                      <div className="flex justify-between">
+                        <span className="font-medium">Data Ordine:</span>
+                        <span>{o.data_ordine ? o.data_ordine.slice(0, 10) : '-'}</span>
+                      </div>
+                      
+                      <div className="flex justify-between">
+                        <span className="font-medium">Consegna richiesta:</span>
+                        <span>{o.consegna_richiesta || '-'}</span>
+                      </div>
+                      
+                      {o.note && (
+                        <div className="flex justify-between">
+                          <span className="font-medium">Note:</span>
+                          <span className="text-right text-xs max-w-[200px] truncate" title={o.note}>
+                            {o.note}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {isSuperuser && (
+                      <div className="card-actions justify-end mt-4">
+                        <button
+                          className="btn btn-sm btn-outline"
+                          onClick={() => setStatusChangeTarget(o)}
+                        >
+                          Cambia Stato
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline"
+                          onClick={() => setGcodeChangeTarget(o)}
+                        >
+                          Cambia G-code
+                        </button>
+                        <button
+                          className="btn btn-sm btn-error"
+                          onClick={() => setDeleteTarget(o)}
+                        >
+                          Elimina
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </>
       )}
       <ConfirmModal
         open={!!deleteTarget}
@@ -466,7 +567,14 @@ export default function OrdersPage() {
 
       {/* Modal per cambio G-code */}
       {gcodeChangeTarget && (
-        <div className="modal modal-open">
+        <div className="modal modal-open z-50">
+          <div 
+            className="modal-backdrop" 
+            onClick={() => {
+              setGcodeChangeTarget(null)
+              setSelectedNewGcode(undefined)
+            }}
+          ></div>
           <div className="modal-box">
             <h3 className="font-bold text-lg mb-4">Cambia G-code per Ordine #{gcodeChangeTarget.id}</h3>
             <div className="mb-4">
@@ -490,7 +598,7 @@ export default function OrdersPage() {
                 <option value="">Seleziona un G-code...</option>
                 {availableGcodes.map(gcode => (
                   <option key={gcode.id} value={gcode.id}>
-                    {gcode.nome_file.split('/').pop() || gcode.nome_file}
+                    {gcode.nome_file ? gcode.nome_file.split('/').pop() || gcode.nome_file : 'N/A'}
                   </option>
                 ))}
               </select>
