@@ -8,13 +8,13 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "clean": "rm -rf .next && rm -rf out",
-    "postbuild": "next-sitemap"
+    "clean": "rm -rf .next && rm -rf out"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.52.1",
     "@types/jszip": "^3.4.0",
+    "critters": "^0.0.23",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",
     "jszip": "^3.10.1",
