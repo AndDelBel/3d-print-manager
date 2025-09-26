@@ -76,14 +76,15 @@ export function CascadingFilters({
   }, [userId, isSuperuser])
 
   // Seleziona automaticamente l'organizzazione se l'utente non è superuser e ha una sola organizzazione
+  // Ma solo se non c'è già un'organizzazione selezionata via URL parameters
   useEffect(() => {
-    if (!isSuperuser && orgs.length === 1 && !selectedOrg) {
+    if (!isSuperuser && orgs.length === 1 && !selectedOrg && !externalSelectedOrg) {
       const orgId = orgs[0].id
       console.log('CascadingFilters: Selezione automatica organizzazione', orgId)
       setSelectedOrg(orgId)
       onOrgChange?.(orgId)
     }
-  }, [isSuperuser, orgs, selectedOrg, onOrgChange])
+  }, [isSuperuser, orgs, selectedOrg, externalSelectedOrg, onOrgChange])
 
   // Al cambio org, carica commesse
   useEffect(() => {
