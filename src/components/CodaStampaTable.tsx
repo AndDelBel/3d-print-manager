@@ -1,8 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import type { OrdineInCoda, CodaStampaStato } from '@/types/codaStampa'
-import { getStampanteNameByGcodeId } from '@/services/codaStampa'
+import type { OrdineInCoda } from '@/types/codaStampa'
 import { getStatusBadge } from '@/utils/statusUtils'
 
 interface CodaStampaTableProps {
@@ -12,25 +10,7 @@ interface CodaStampaTableProps {
   onStatusChange: (order: OrdineInCoda) => void
 }
 
-export function CodaStampaTable({ coda, isSuperuser, onRefresh, onStatusChange }: CodaStampaTableProps) {
-  const [stampanteNames, setStampanteNames] = useState<Map<number, string>>(new Map())
-
-  // Carica i nomi delle stampanti
-  useEffect(() => {
-    const loadStampanteNames = async () => {
-      const names = new Map<number, string>()
-      for (const item of coda) {
-        if (item.gcode?.[0]?.stampante && !names.has(item.gcode[0].id)) {
-          names.set(item.gcode[0].id, item.gcode[0].stampante)
-        }
-      }
-      setStampanteNames(names)
-    }
-
-    if (coda.length > 0) {
-      loadStampanteNames()
-    }
-  }, [coda])
+export function CodaStampaTable({ coda, isSuperuser, onStatusChange }: CodaStampaTableProps) {
 
   const formatFileName = (fileName: string) => {
     return fileName ? fileName.split('/').pop()?.replace(/\.[^/.]+$/, '') || fileName : 'N/A'
@@ -79,29 +59,39 @@ export function CodaStampaTable({ coda, isSuperuser, onRefresh, onStatusChange }
           </tr>
         </thead>
         <tbody>
-          {coda.map((item, index) => {
+          {coda.map((item) => {
             const gcode = item.gcode?.[0]
+            const fileOrigine = item.file_origine?.[0]
             const commessa = item.commessa?.[0]
             const organizzazione = item.organizzazione?.[0]
             
             return (
               <tr key={item.id}>
                 <td>
-                  <div className="font-medium">
-                    {gcode ? formatFileName(gcode.nome_file) : 'N/A'}
+                  <div className="max-w-xs truncate" title={gcode ? formatFileName(gcode.nome_file) : fileOrigine ? formatFileName(fileOrigine.nome_file) : 'N/A'}>
+                    <div className="font-medium">
+                      {gcode ? formatFileName(gcode.nome_file) : 
+                       fileOrigine ? formatFileName(fileOrigine.nome_file) : 'N/A'}
+                    </div>
                   </div>
                   {gcode?.materiale && (
                     <div className="text-sm opacity-70">{gcode.materiale}</div>
+                  )}
+                  {!gcode && fileOrigine && (
+                    <div className="text-sm opacity-70 text-warning">G-code da associare</div>
                   )}
                 </td>
                 <td>{commessa?.nome || 'N/A'}</td>
                 <td>{organizzazione?.nome || 'N/A'}</td>
                 <td>
                   <div className="font-medium">
-                    {getStampanteDisplay(gcode)}
+                    {gcode ? getStampanteDisplay(gcode) : 'Da definire'}
                   </div>
                   {gcode?.materiale && (
                     <div className="text-sm opacity-70">{gcode.materiale}</div>
+                  )}
+                  {!gcode && (
+                    <div className="text-sm opacity-70 text-warning">G-code richiesto</div>
                   )}
                 </td>
                 <td>{item.quantita}</td>
@@ -142,8 +132,9 @@ export function CodaStampaTable({ coda, isSuperuser, onRefresh, onStatusChange }
 
       {/* Mobile Card View */}
       <div className="md:hidden space-y-4">
-        {coda.map((item, index) => {
+        {coda.map((item) => {
           const gcode = item.gcode?.[0]
+          const fileOrigine = item.file_origine?.[0]
           const commessa = item.commessa?.[0]
           const organizzazione = item.organizzazione?.[0]
           
@@ -151,8 +142,9 @@ export function CodaStampaTable({ coda, isSuperuser, onRefresh, onStatusChange }
             <div key={item.id} className="card bg-base-100 shadow-xl border border-base-300">
               <div className="card-body p-4">
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className="card-title text-lg">
-                    {gcode ? formatFileName(gcode.nome_file) : 'N/A'}
+                  <h3 className="card-title text-lg max-w-[200px] truncate" title={gcode ? formatFileName(gcode.nome_file) : fileOrigine ? formatFileName(fileOrigine.nome_file) : 'N/A'}>
+                    {gcode ? formatFileName(gcode.nome_file) : 
+                     fileOrigine ? formatFileName(fileOrigine.nome_file) : 'N/A'}
                   </h3>
                   <div className="badge badge-primary">
                     {getStatusBadge(item.stato)}
@@ -172,7 +164,7 @@ export function CodaStampaTable({ coda, isSuperuser, onRefresh, onStatusChange }
                   
                   <div className="flex justify-between">
                     <span className="font-medium">Stampante:</span>
-                    <span className="text-right">{getStampanteDisplay(gcode)}</span>
+                    <span className="text-right">{gcode ? getStampanteDisplay(gcode) : 'Da definire'}</span>
                   </div>
                   
                   <div className="flex justify-between">

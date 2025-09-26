@@ -12,7 +12,6 @@ import { listFileOrigineByIds } from '@/services/fileOrigine'
 
 import { filterBySearch } from '@/utils/filterUtils'
 import type { Ordine } from '@/types/ordine'
-import { AlertMessage } from '@/components/AlertMessage'
 import { LoadingButton } from '@/components/LoadingButton'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { StatusChangeModal } from '@/components/StatusChangeModal'
@@ -32,8 +31,6 @@ export default function OrdersPage() {
   const [orgId, setOrgId] = useState<number | undefined>(undefined)
   const [search, setSearch] = useState('')
   const [filterComm, setFilterComm] = useState('')
-  const [statusError, setStatusError] = useState<string | null>(null)
-  const [statusSuccess, setStatusSuccess] = useState<string | null>(null)
 
   const [deleteTarget, setDeleteTarget] = useState<Ordine | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
@@ -77,12 +74,12 @@ export default function OrdersPage() {
   // Carica ordini
   useEffect(() => {
     if (!loading) {
-      listOrders({ organizzazione_id: isSuperuser ? undefined : orgId, isSuperuser })
+      listOrders({ organizzazione_id: isSuperuser ? undefined : orgId })
         .then(async (ordersList) => {
           setOrders(ordersList)
           
-          // Carica i G-code per tutti gli ordini
-          const gcodeIds = [...new Set(ordersList.map(o => o.gcode_id))]
+          // Carica i G-code per tutti gli ordini (solo quelli con gcode_id non null)
+          const gcodeIds = [...new Set(ordersList.map(o => o.gcode_id).filter(id => id !== null))] as number[]
           const gcodeMap = new Map<number, Gcode>()
           
           for (const gcodeId of gcodeIds) {
@@ -100,17 +97,40 @@ export default function OrdersPage() {
           setGcodes(gcodeMap)
 
           // Carica file origine associati agli ordini
-          const fileOrigineIds: number[] = []
-          for (const gcodeId of gcodeIds) {
-            const gcode = gcodeMap.get(gcodeId)
-            if (gcode && gcode.file_origine_id) {
-              fileOrigineIds.push(gcode.file_origine_id)
+          // Se file_origine_id non esiste, usa gcode per recuperare file_origine_id
+          const fileOrigineIds = new Set<number>()
+          
+          // Prima prova a usare file_origine_id se esiste
+          ordersList.forEach(o => {
+            if (o.file_origine_id) {
+              fileOrigineIds.add(o.file_origine_id)
+            }
+          })
+          
+          // Se non abbiamo file_origine_id, recupera dai gcode
+          if (fileOrigineIds.size === 0) {
+            const gcodeIds = [...new Set(ordersList.map(o => o.gcode_id).filter(id => id !== null))] as number[]
+            if (gcodeIds.length > 0) {
+              try {
+                const gcodeList = await listGcode({ file_origine_id: undefined })
+                gcodeIds.forEach(gcodeId => {
+                  const gcode = gcodeList.find(g => g.id === gcodeId)
+                  if (gcode) {
+                    fileOrigineIds.add(gcode.file_origine_id)
+                  }
+                })
+              } catch (err) {
+                console.error('Errore caricamento gcode per file origine:', err)
+              }
             }
           }
-          const fileOrigineArr = await listFileOrigineByIds([...new Set(fileOrigineIds)])
-          const fileMap = new Map<number, FileOrigine>()
-          fileOrigineArr.forEach(f => fileMap.set(f.id, f))
-          setFileOrigineMap(fileMap)
+          
+          if (fileOrigineIds.size > 0) {
+            const fileOrigineArr = await listFileOrigineByIds([...fileOrigineIds])
+            const fileMap = new Map<number, FileOrigine>()
+            fileOrigineArr.forEach(f => fileMap.set(f.id, f))
+            setFileOrigineMap(fileMap)
+          }
         })
         .catch(console.error)
     }
@@ -130,10 +150,21 @@ export default function OrdersPage() {
     return gcode ? (gcode.nome_file ? gcode.nome_file.split('/').pop() || gcode.nome_file : `G-code ${gcodeId}`) : `G-code ${gcodeId}`
   }
 
-  const getFileOrigine = (gcodeId: number) => {
-    const gcode = gcodes.get(gcodeId)
-    if (!gcode) return undefined
-    return fileOrigineMap.get(gcode.file_origine_id)
+  const getFileOrigine = (order: Ordine) => {
+    // Prima prova a usare file_origine_id se esiste
+    if (order.file_origine_id) {
+      return fileOrigineMap.get(order.file_origine_id)
+    }
+    
+    // Se non esiste, prova a recuperarlo dal gcode
+    if (order.gcode_id) {
+      const gcode = gcodes.get(order.gcode_id)
+      if (gcode) {
+        return fileOrigineMap.get(gcode.file_origine_id)
+      }
+    }
+    
+    return undefined
   }
 
 
@@ -164,12 +195,12 @@ export default function OrdersPage() {
       [
         o => String(o.id), 
         o => {
-          const file = getFileOrigine(o.gcode_id)
+          const file = getFileOrigine(o)
           return file ? (file.nome_file ? file.nome_file.split('/').pop() || file.nome_file : '') : ''
         }
       ]
     ),
-    [orders, search]
+    [orders, search, fileOrigineMap, gcodes]
   )
 
   // Filtro per organizzazione e commessa
@@ -200,15 +231,11 @@ export default function OrdersPage() {
   const handleStatusChangeFromModal = async (newStatus: Ordine['stato']) => {
     if (!statusChangeTarget) return
     setStatusChangeLoading(true)
-    setStatusError(null)
-    setStatusSuccess(null)
     try {
       await updateOrderStatus(statusChangeTarget.id, newStatus)
-      setOrders(await listOrders({ organizzazione_id: isSuperuser ? undefined : orgId, isSuperuser }))
-      setStatusSuccess('Stato ordine aggiornato!')
+      setOrders(await listOrders({ organizzazione_id: isSuperuser ? undefined : orgId }))
       setStatusChangeTarget(null)
     } catch (err) {
-      setStatusError('Errore aggiornamento stato ordine')
       console.error('Errore aggiornamento stato ordine:', err)
     } finally {
       setStatusChangeLoading(false)
@@ -218,14 +245,10 @@ export default function OrdersPage() {
   const handleDelete = async () => {
     if (!deleteTarget) return
     setDeleteLoading(true)
-    setStatusError(null)
-    setStatusSuccess(null)
     try {
       await deleteOrder(deleteTarget.id)
-      setOrders(await listOrders({ organizzazione_id: isSuperuser ? undefined : orgId, isSuperuser }))
-      setStatusSuccess('Ordine eliminato con successo!')
+      setOrders(await listOrders({ organizzazione_id: isSuperuser ? undefined : orgId }))
     } catch (err) {
-      setStatusError('Errore eliminazione ordine')
       console.error('Errore eliminazione ordine:', err)
     } finally {
       setDeleteLoading(false)
@@ -236,16 +259,12 @@ export default function OrdersPage() {
   const handleGcodeChange = async () => {
     if (!gcodeChangeTarget || !selectedNewGcode) return
     setGcodeChangeLoading(true)
-    setStatusError(null)
-    setStatusSuccess(null)
     try {
       await updateOrderGcode(gcodeChangeTarget.id, selectedNewGcode)
-      setOrders(await listOrders({ organizzazione_id: isSuperuser ? undefined : orgId, isSuperuser }))
-      setStatusSuccess('G-code dell\'ordine aggiornato con successo!')
+      setOrders(await listOrders({ organizzazione_id: isSuperuser ? undefined : orgId }))
       setGcodeChangeTarget(null)
       setSelectedNewGcode(undefined)
     } catch (err) {
-      setStatusError('Errore aggiornamento G-code ordine')
       console.error('Errore aggiornamento G-code ordine:', err)
     } finally {
       setGcodeChangeLoading(false)
@@ -262,7 +281,6 @@ export default function OrdersPage() {
       setAvailableGcodes(allGcodes)
     } catch (err) {
       console.error('Errore caricamento G-code:', err)
-      setStatusError('Errore caricamento G-code disponibili')
     }
   }
 
@@ -355,38 +373,40 @@ export default function OrdersPage() {
           {/* Desktop Table View */}
           <div className="hidden md:block w-full">
             <div className="overflow-x-auto overscroll-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200">
-              <table className="table table-zebra w-full min-w-[800px]">
+              <table className="table table-zebra w-full min-w-[600px]">
             <thead>
               <tr>
                 <th className="whitespace-nowrap">ID</th>
-                <th className="whitespace-nowrap">File</th>
+                <th className="whitespace-nowrap max-w-[200px]">File</th>
                 <th className="whitespace-nowrap">Commessa</th>
                 {(isSuperuser || orgs.length > 1) && <th className="whitespace-nowrap">Organizzazione</th>}
                 <th className="whitespace-nowrap">Quantità</th>
                 <th className="whitespace-nowrap">Data Ordine</th>
                 <th className="whitespace-nowrap">Consegna richiesta</th>
-                <th className="whitespace-nowrap">Note</th>
+                <th className="whitespace-nowrap max-w-[100px]">Note</th>
                 <th className="whitespace-nowrap">Stato</th>
                 {isSuperuser && <th className="whitespace-nowrap">Azioni</th>}
               </tr>
             </thead>
             <tbody>
               {filtered.map(o => {
-                const file = getFileOrigine(o.gcode_id)
+                const file = getFileOrigine(o)
                 return (
                   <tr key={o.id}>
                     <td>#{o.id}</td>
                     <td>
-                      {file ? (
-                        <a
-                          href={`/dashboard/files/${file.id}`}
-                          className="link link-primary"
-                        >
-                          {file.nome_file ? file.nome_file.split('/').pop() || file.nome_file : 'N/A'}
-                        </a>
-                      ) : (
-                        <span className="text-base-content/50">-</span>
-                      )}
+                      <div className="max-w-[200px] truncate" title={file?.nome_file ? file.nome_file.split('/').pop() || file.nome_file : ''}>
+                        {file ? (
+                          <a
+                            href={`/dashboard/files/${file.id}`}
+                            className="link link-primary"
+                          >
+                            {file.nome_file ? file.nome_file.split('/').pop() || file.nome_file : 'N/A'}
+                          </a>
+                        ) : (
+                          <span className="text-base-content/50">-</span>
+                        )}
+                      </div>
                     </td>
                     <td>{getCommessaName(o.commessa_id)}</td>
                     {(isSuperuser || orgs.length > 1) && <td>{getOrgName(o.organizzazione_id)}</td>}
@@ -395,7 +415,7 @@ export default function OrdersPage() {
                     <td>{o.consegna_richiesta ? o.consegna_richiesta : <span className="text-base-content/50">-</span>}</td>
                     <td>
                       {o.note ? (
-                        <div className="max-w-xs truncate" title={o.note}>
+                        <div className="max-w-[100px] truncate" title={o.note}>
                           {o.note}
                         </div>
                       ) : (
@@ -460,8 +480,8 @@ export default function OrdersPage() {
 
           {/* Mobile Card View */}
           <div className="md:hidden space-y-4">
-            {filtered.map(o => {
-              const file = getFileOrigine(o.gcode_id)
+                {filtered.map(o => {
+                  const file = getFileOrigine(o)
               return (
                 <div key={o.id} className="card bg-base-100 shadow-xl border border-base-300">
                   <div className="card-body p-4">
@@ -475,7 +495,7 @@ export default function OrdersPage() {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="font-medium">File:</span>
-                        <span className="text-right">
+                        <span className="text-right max-w-[200px] truncate" title={file?.nome_file ? file.nome_file.split('/').pop() || file.nome_file : ''}>
                           {file ? (
                             <a
                               href={`/dashboard/files/${file.id}`}
@@ -582,7 +602,7 @@ export default function OrdersPage() {
                 <span className="label-text">G-code attuale:</span>
               </label>
               <div className="p-2 bg-base-200 rounded text-sm">
-                {getGcodeName(gcodeChangeTarget.gcode_id)}
+                {gcodeChangeTarget.gcode_id ? getGcodeName(gcodeChangeTarget.gcode_id) : 'Nessun G-code associato'}
               </div>
             </div>
             <div className="mb-4">

@@ -54,6 +54,8 @@ function CreateOrderContent() {
         setTableExists(exists)
         if (!exists) {
           setError('La tabella ordine non esiste nel database.')
+        } else {
+          setError(null)
         }
       }).catch(err => {
         console.error('Errore verifica tabella ordine:', err)
@@ -73,26 +75,24 @@ function CreateOrderContent() {
     if (quantita < 1)      return setError('Quantità non valida')
     setSaving(true)
     try {
-      // Trova il G-code associato al file selezionato
+      // Verifica se esiste un G-code associato al file selezionato
       const gcodes = await listGcode({ file_origine_id: selectedFile })
-      if (gcodes.length === 0) {
-        setError('Il file non è ancora stato revisionato, non è disponibile per ordini automatici.')
-        setSaving(false)
-        return
-      }
-      
-      // Usa il primo G-code disponibile
-      const gcodeId = gcodes[0].id
+      const gcodeId = gcodes.length > 0 ? gcodes[0].id : null
       
       await createOrder(
         gcodeId,
+        selectedFile,
         quantita,
         dataConsegna || null,
         note || null,
         selectedOrg,
         user?.id
       )
-      setSuccess('Ordine creato con successo!')
+      
+      const successMessage = gcodeId 
+        ? 'Ordine creato con successo!'
+        : 'Ordine creato con successo! Il G-code potrà essere associato successivamente.'
+      setSuccess(successMessage)
       setTimeout(() => router.push('/dashboard/orders'), 1000)
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message)

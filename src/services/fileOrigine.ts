@@ -8,7 +8,7 @@ function cleanName(str: string): string {
     .toLowerCase()
 }
 
-export async function listFileOrigine({ commessa_id, organizzazione_id, isSuperuser = false }: { commessa_id?: number, organizzazione_id?: number, isSuperuser?: boolean }): Promise<FileOrigine[]> {
+export async function listFileOrigine({ commessa_id }: { commessa_id?: number, organizzazione_id?: number, isSuperuser?: boolean }): Promise<FileOrigine[]> {
   let query = supabase
     .from('file_origine')
     .select('*')
@@ -36,6 +36,21 @@ export async function listFileOrigineByIds(ids: number[]): Promise<FileOrigine[]
     .in('id', ids)
   if (error) throw error;
   return data || [];
+}
+
+export async function getFileOrigineWithRelations(id: number): Promise<FileOrigine & { commessa?: { id: number, nome: string, organizzazione_id: number }, organizzazione?: { id: number, nome: string } }> {
+  const { data, error } = await supabase
+    .from('file_origine')
+    .select(`
+      *,
+      commessa:commessa_id(id, nome, organizzazione_id),
+      organizzazione:commessa!inner(id, nome)
+    `)
+    .eq('id', id)
+    .single();
+  
+  if (error) throw error;
+  return data;
 }
 
 export async function uploadFileOrigine(

@@ -147,7 +147,11 @@ export function FileTable<T extends FileItem>({
             console.log('FileTable row', { id: i.id, nome_file: i.nome_file, gcode: gcodeList })
             return (
               <tr key={i.id}>
-                <td className="border px-4 py-2">{parseDisplayName(path)}</td>
+                <td className="border px-4 py-2">
+                  <div className="max-w-xs truncate" title={parseDisplayName(path)}>
+                    {parseDisplayName(path)}
+                  </div>
+                </td>
                 <td className="border px-4 py-2">{comm}</td>
                 <td className="border px-4 py-2">{org}</td>
                 {isAdmin && (

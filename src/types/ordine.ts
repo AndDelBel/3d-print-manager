@@ -1,7 +1,8 @@
 export interface Ordine {
   id: number;
   stato: 'processamento' | 'in_coda' | 'in_stampa' | 'pronto' | 'consegnato' | 'error';
-  gcode_id: number; // FK su gcode
+  gcode_id: number | null; // FK su gcode (opzionale)
+  file_origine_id?: number; // FK su file_origine (opzionale per compatibilità)
   commessa_id: number;
   organizzazione_id: number;
   user_id: string;
@@ -22,5 +23,10 @@ export interface OrdineWithRelations extends Ordine {
     tempo_stampa_min?: number;
     materiale?: string;
     stampante?: string;
+  }[];
+  file_origine?: {
+    id: number;
+    nome_file: string;
+    descrizione?: string | null;
   }[];
 }

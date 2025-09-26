@@ -36,8 +36,7 @@ export function AddToQueueModal({
     try {
       // Carica ordini disponibili (non in coda)
       const ordiniData = await listOrders({ 
-        organizzazione_id: isSuperuser ? undefined : organizzazione_id,
-        isSuperuser 
+        organizzazione_id: isSuperuser ? undefined : organizzazione_id
       })
       // Filtra solo ordini che possono essere aggiunti alla coda
       const ordiniDisponibili = ordiniData.filter((o: Ordine) => 

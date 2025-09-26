@@ -48,25 +48,34 @@ export function RigaTabellaFile({
       <td>{riga.commessa}</td>
       <td>{riga.descrizione ? <span title={riga.descrizione} className="max-w-xs truncate inline-block align-top">{riga.descrizione}</span> : <span className="text-base-content/50">-</span>}</td>
       <td onClick={(e) => e.stopPropagation()}>
-        {riga.nomeGcode ? (
-          <div className="flex items-center gap-2">
-            <span className="badge badge-success">✓</span>
-            <Link 
-              href={getOrderUrl()}
-              className="btn btn-primary btn-xs"
-              onClick={(e) => e.stopPropagation()}
-            >
-              Ordina
-            </Link>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <span className="badge badge-error">✗</span>
-            {isSuperuser && (
-              <button onClick={() => onAssocia(riga.id)} className="btn btn-success btn-xs">Associa</button>
-            )}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {riga.nomeGcode ? (
+            <>
+              <span className="badge badge-success">✓</span>
+              <Link 
+                href={getOrderUrl()}
+                className="btn btn-primary btn-xs"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Ordina
+              </Link>
+            </>
+          ) : (
+            <>
+              <span className="badge badge-warning">⚠</span>
+              <Link 
+                href={getOrderUrl()}
+                className="btn btn-primary btn-xs"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Ordina
+              </Link>
+              {isSuperuser && (
+                <button onClick={() => onAssocia(riga.id)} className="btn btn-success btn-xs">Associa</button>
+              )}
+            </>
+          )}
+        </div>
       </td>
     </tr>
   )

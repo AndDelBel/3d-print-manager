@@ -1,8 +1,7 @@
 import { supabase } from '@/lib/supabaseClient'
 import type { Ordine } from '@/types/ordine'
-import { addToCodaStampa, updateCodaStampaStatus, removeFromCodaStampa } from './codaStampa'
 
-export async function listOrders({ organizzazione_id, isSuperuser = false }: { organizzazione_id?: number, isSuperuser?: boolean } = {}): Promise<Ordine[]> {
+export async function listOrders({ organizzazione_id }: { organizzazione_id?: number } = {}): Promise<Ordine[]> {
   let query = supabase
     .from('ordine')
     .select('*')
@@ -16,6 +15,7 @@ export async function listOrders({ organizzazione_id, isSuperuser = false }: { o
   const { data, error } = await query;
   
   if (error) {
+    console.error('Errore caricamento ordini:', error);
     throw error;
   }
   
@@ -23,7 +23,8 @@ export async function listOrders({ organizzazione_id, isSuperuser = false }: { o
 }
 
 export async function createOrder(
-  gcode_id: number,
+  gcode_id: number | null,
+  file_origine_id: number,
   quantita: number,
   data_consegna?: string | null,
   note?: string | null,
@@ -38,21 +39,11 @@ export async function createOrder(
     uid = userData.user.id
   }
 
-  // Recupera commessa_id dal gcode
-  const { data: gcode, error: gcodeError } = await supabase
-    .from('gcode')
-    .select('file_origine_id')
-    .eq('id', gcode_id)
-    .single()
-  if (gcodeError || !gcode) {
-    throw gcodeError || new Error('G-code non trovato')
-  }
-
   // Recupera commessa_id dal file_origine
   const { data: fileOrigine, error: fileError } = await supabase
     .from('file_origine')
     .select('commessa_id')
-    .eq('id', gcode.file_origine_id)
+    .eq('id', file_origine_id)
     .single()
   if (fileError || !fileOrigine) {
     throw fileError || new Error('File origine non trovato')
@@ -72,7 +63,8 @@ export async function createOrder(
     orgId = commessa.organizzazione_id
   }
 
-  const row: Partial<Ordine> = {
+  // Crea l'oggetto per l'inserimento - rimuovi file_origine_id se la colonna non esiste
+  const row: any = {
     gcode_id,
     commessa_id: fileOrigine.commessa_id,
     organizzazione_id: orgId,
@@ -83,15 +75,30 @@ export async function createOrder(
     consegna_richiesta: data_consegna ?? null,
     note: note ?? null,
   }
-  
+
+  // Prova ad aggiungere file_origine_id solo se la colonna esiste
   try {
-    const { data, error } = await supabase
+    // Prima prova a inserire con file_origine_id
+    const rowWithFileOrigine = { ...row, file_origine_id }
+    const { error } = await supabase
       .from('ordine')
-      .insert([row])
+      .insert([rowWithFileOrigine])
       .select()
     
     if (error) {
-      throw new Error(`Errore inserimento ordine: ${error.message}`)
+      // Se fallisce, prova senza file_origine_id (per compatibilità con schema vecchio)
+      if (error.message.includes('file_origine_id')) {
+        const { error: fallbackError } = await supabase
+          .from('ordine')
+          .insert([row])
+          .select()
+        
+        if (fallbackError) {
+          throw new Error(`Errore inserimento ordine: ${fallbackError.message}`)
+        }
+      } else {
+        throw new Error(`Errore inserimento ordine: ${error.message}`)
+      }
     }
   } catch (err) {
     if (err instanceof Error) {
@@ -117,7 +124,7 @@ export async function updateOrderStatus(
   if (stato === 'error') {
     try {
       await duplicateOrder(id)
-    } catch (duplicateError) {
+    } catch {
       // Non blocchiamo l'operazione principale se la duplicazione fallisce
     }
   }
@@ -163,7 +170,7 @@ export async function checkOrdineTableExists(): Promise<boolean> {
       return false
     }
     return true
-  } catch (err) {
+  } catch {
     return false
   }
 }
@@ -173,7 +180,8 @@ export async function createOrdineTable(): Promise<void> {
   const sql = `
     CREATE TABLE IF NOT EXISTS ordine (
       id SERIAL PRIMARY KEY,
-      gcode_id INTEGER NOT NULL REFERENCES gcode(id) ON DELETE CASCADE,
+      gcode_id INTEGER REFERENCES gcode(id) ON DELETE CASCADE,
+      file_origine_id INTEGER NOT NULL REFERENCES file_origine(id) ON DELETE CASCADE,
       commessa_id INTEGER NOT NULL REFERENCES commessa(id) ON DELETE CASCADE,
       organizzazione_id INTEGER NOT NULL REFERENCES organizzazione(id) ON DELETE CASCADE,
       user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -192,15 +200,76 @@ export async function createOrdineTable(): Promise<void> {
   }
 }
 
+// Funzione per migrare la tabella ordine esistente
+export async function migrateOrdineTable(): Promise<void> {
+  try {
+    // Prima controlla se la colonna file_origine_id esiste già
+    const checkColumnSql = `
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'ordine' AND column_name = 'file_origine_id';
+    `
+    
+    const { data: columnExists, error: checkError } = await supabase.rpc('exec_sql', { sql: checkColumnSql })
+    
+    if (checkError) {
+      console.error('Errore verifica colonna:', checkError)
+      throw checkError
+    }
+    
+    // Se la colonna non esiste, aggiungila
+    if (!columnExists || columnExists.length === 0) {
+      console.log('Aggiungendo colonna file_origine_id alla tabella ordine...')
+      
+      // Prima rendi gcode_id nullable
+      const makeGcodeNullableSql = `
+        ALTER TABLE ordine ALTER COLUMN gcode_id DROP NOT NULL;
+      `
+      
+      const { error: nullableError } = await supabase.rpc('exec_sql', { sql: makeGcodeNullableSql })
+      if (nullableError) {
+        console.warn('Errore rendendo gcode_id nullable:', nullableError)
+      }
+      
+      // Aggiungi la colonna file_origine_id
+      const addColumnSql = `
+        ALTER TABLE ordine ADD COLUMN file_origine_id INTEGER;
+      `
+      
+      const { error: addColumnError } = await supabase.rpc('exec_sql', { sql: addColumnSql })
+      if (addColumnError) {
+        console.error('Errore aggiunta colonna file_origine_id:', addColumnError)
+        throw addColumnError
+      }
+      
+      // Aggiungi la foreign key constraint
+      const addForeignKeySql = `
+        ALTER TABLE ordine 
+        ADD CONSTRAINT fk_ordine_file_origine 
+        FOREIGN KEY (file_origine_id) REFERENCES file_origine(id) ON DELETE CASCADE;
+      `
+      
+      const { error: fkError } = await supabase.rpc('exec_sql', { sql: addForeignKeySql })
+      if (fkError) {
+        console.warn('Errore aggiunta foreign key:', fkError)
+      }
+      
+      console.log('Migrazione tabella ordine completata!')
+    } else {
+      console.log('Colonna file_origine_id già presente nella tabella ordine')
+    }
+  } catch (error) {
+    console.error('Errore durante la migrazione:', error)
+    throw error
+  }
+}
+
 export async function listOrdersByFileOrigine(file_origine_id: number): Promise<Ordine[]> {
-  // Query con join per ottenere ordini associati a un file_origine
+  // Query per ottenere ordini associati a un file_origine
   const { data, error } = await supabase
     .from('ordine')
-    .select(`
-      *,
-      gcode!inner(file_origine_id)
-    `)
-    .eq('gcode.file_origine_id', file_origine_id)
+    .select('*')
+    .eq('file_origine_id', file_origine_id)
     .order('data_ordine', { ascending: false });
   
   if (error) throw error;
@@ -231,6 +300,7 @@ export async function duplicateOrder(originalOrderId: number): Promise<number> {
   // Crea un nuovo ordine con gli stessi dati ma stato "in_coda" e note aggiornate
   const newOrder: Partial<Ordine> = {
     gcode_id: originalOrder.gcode_id,
+    file_origine_id: originalOrder.file_origine_id,
     commessa_id: originalOrder.commessa_id,
     organizzazione_id: originalOrder.organizzazione_id,
     user_id: originalOrder.user_id,

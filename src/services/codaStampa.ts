@@ -16,6 +16,7 @@ export async function listCodaStampaWithRelations({
       id,
       stato,
       gcode_id,
+      file_origine_id,
       commessa_id,
       organizzazione_id,
       user_id,
@@ -32,6 +33,11 @@ export async function listCodaStampaWithRelations({
         tempo_stampa_min,
         materiale,
         stampante_id
+      ),
+      file_origine (
+        id,
+        nome_file,
+        descrizione
       ),
       commessa (
         id,
@@ -144,7 +150,7 @@ export async function updateCodaStampaStatus(
     try {
       const { duplicateOrder } = await import('@/services/ordine')
       await duplicateOrder(id)
-    } catch (duplicateError) {
+    } catch {
       // Non blocchiamo l'operazione principale se la duplicazione fallisce
     }
   }
@@ -179,6 +185,7 @@ export async function getNextInQueue(stampante_id: number): Promise<OrdineInCoda
       id,
       stato,
       gcode_id,
+      file_origine_id,
       commessa_id,
       organizzazione_id,
       user_id,
@@ -193,6 +200,11 @@ export async function getNextInQueue(stampante_id: number): Promise<OrdineInCoda
         tempo_stampa_min,
         materiale,
         stampante
+      ),
+      file_origine (
+        id,
+        nome_file,
+        descrizione
       )
     `)
     .eq('stato', 'in_coda')

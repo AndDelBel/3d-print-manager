@@ -5,7 +5,8 @@ export type CodaStampaStato = 'in_coda' | 'in_stampa' | 'pronto' | 'consegnato' 
 export interface OrdineInCoda {
   id: number;
   stato: CodaStampaStato;
-  gcode_id: number;
+  gcode_id: number | null;
+  file_origine_id?: number; // Opzionale per compatibilità
   commessa_id: number;
   organizzazione_id: number;
   user_id: string;
@@ -24,6 +25,11 @@ export interface OrdineInCoda {
     tempo_stampa_min?: number;
     materiale?: string;
     stampante?: string;
+  }[];
+  file_origine?: {
+    id: number;
+    nome_file: string;
+    descrizione?: string | null;
   }[];
   commessa?: {
     id: number;

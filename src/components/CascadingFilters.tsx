@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { listOrg } from '@/services/organizzazione'
 import { listCommesse } from '@/services/commessa'
-import { listFileOrigine } from '@/services/fileOrigine'
+import { listFileOrigine, getFileOrigineWithRelations } from '@/services/fileOrigine'
 import type { Organizzazione } from '@/types/organizzazione'
 import type { Commessa } from '@/types/commessa'
 import type { FileOrigine } from '@/types/fileOrigine'
@@ -46,18 +46,27 @@ export function CascadingFilters({
   const [loadingCommesse, setLoadingCommesse] = useState(false)
   const [loadingFiles, setLoadingFiles] = useState(false)
 
-  // Sincronizza stato interno con props esterne
+  // Sincronizza stato interno con props esterne e carica dati a cascata
   useEffect(() => {
-    setSelectedOrg(externalSelectedOrg)
-  }, [externalSelectedOrg])
+    if (externalSelectedOrg && externalSelectedOrg !== selectedOrg) {
+      console.log('CascadingFilters: Organizzazione impostata via props', externalSelectedOrg)
+      setSelectedOrg(externalSelectedOrg)
+    }
+  }, [externalSelectedOrg, selectedOrg])
 
   useEffect(() => {
-    setSelectedCommessa(externalSelectedCommessa)
-  }, [externalSelectedCommessa])
+    if (externalSelectedCommessa && externalSelectedCommessa !== selectedCommessa) {
+      console.log('CascadingFilters: Commessa impostata via props', externalSelectedCommessa)
+      setSelectedCommessa(externalSelectedCommessa)
+    }
+  }, [externalSelectedCommessa, selectedCommessa])
 
   useEffect(() => {
-    setSelectedFile(externalSelectedFile)
-  }, [externalSelectedFile])
+    if (externalSelectedFile && externalSelectedFile !== selectedFile) {
+      console.log('CascadingFilters: File impostato via props', externalSelectedFile)
+      setSelectedFile(externalSelectedFile)
+    }
+  }, [externalSelectedFile, selectedFile])
 
   // Carica organizzazioni
   useEffect(() => {
@@ -82,28 +91,43 @@ export function CascadingFilters({
       console.log('CascadingFilters: Caricamento commesse per organizzazione', selectedOrg)
       setLoadingCommesse(true)
       setCommesse([]) // Reset immediato
-      setSelectedCommessa(undefined)
-      setFiles([])
-      setSelectedFile(undefined)
-      onCommessaChange?.(undefined)
-      onFileChange?.(undefined)
+      
+      // Se abbiamo una commessa esterna, non resettarla
+      if (!externalSelectedCommessa) {
+        setSelectedCommessa(undefined)
+        setFiles([])
+        setSelectedFile(undefined)
+        onCommessaChange?.(undefined)
+        onFileChange?.(undefined)
+      }
       
       listCommesse({ organizzazione_id: selectedOrg, isSuperuser })
-        .then(setCommesse)
+        .then(commesseData => {
+          setCommesse(commesseData)
+          
+          // Se abbiamo una commessa esterna e non è ancora selezionata, impostala
+          if (externalSelectedCommessa && !selectedCommessa) {
+            console.log('CascadingFilters: Impostazione commessa da props dopo caricamento', externalSelectedCommessa)
+            setSelectedCommessa(externalSelectedCommessa)
+            onCommessaChange?.(externalSelectedCommessa)
+          }
+        })
         .catch(() => setCommesse([]))
         .finally(() => {
           setLoadingCommesse(false)
         })
     } else {
       setCommesse([])
-      setSelectedCommessa(undefined)
-      setFiles([])
-      setSelectedFile(undefined)
-      onCommessaChange?.(undefined)
-      onFileChange?.(undefined)
+      if (!externalSelectedCommessa) {
+        setSelectedCommessa(undefined)
+        setFiles([])
+        setSelectedFile(undefined)
+        onCommessaChange?.(undefined)
+        onFileChange?.(undefined)
+      }
       setLoadingCommesse(false)
     }
-  }, [selectedOrg, isSuperuser, onCommessaChange, onFileChange])
+  }, [selectedOrg, isSuperuser, onCommessaChange, onFileChange, externalSelectedCommessa, selectedCommessa])
 
   // Al cambio commessa, carica file origine (se richiesto)
   useEffect(() => {
@@ -111,23 +135,61 @@ export function CascadingFilters({
       console.log('CascadingFilters: Caricamento file per commessa', selectedCommessa)
       setLoadingFiles(true)
       setFiles([]) // Reset immediato
-      setSelectedFile(undefined)
-      onFileChange?.(undefined)
+      
+      // Se abbiamo un file esterno, non resettarlo
+      if (!externalSelectedFile) {
+        setSelectedFile(undefined)
+        onFileChange?.(undefined)
+      }
       
       listFileOrigine({ 
         commessa_id: selectedCommessa, 
         isSuperuser 
       })
-        .then(setFiles)
+        .then(filesData => {
+          setFiles(filesData)
+          
+          // Se abbiamo un file esterno e non è ancora selezionato, impostalo
+          if (externalSelectedFile && !selectedFile) {
+            console.log('CascadingFilters: Impostazione file da props dopo caricamento', externalSelectedFile)
+            setSelectedFile(externalSelectedFile)
+            onFileChange?.(externalSelectedFile)
+          }
+        })
         .catch(() => setFiles([]))
         .finally(() => setLoadingFiles(false))
     } else if (selectedCommessa === undefined && showFileFilter) {
       setFiles([])
-      setSelectedFile(undefined)
-      onFileChange?.(undefined)
+      if (!externalSelectedFile) {
+        setSelectedFile(undefined)
+        onFileChange?.(undefined)
+      }
       setLoadingFiles(false)
     }
-  }, [selectedCommessa, isSuperuser, showFileFilter, onFileChange])
+  }, [selectedCommessa, isSuperuser, showFileFilter, onFileChange, externalSelectedFile, selectedFile])
+
+  // Se un file è pre-selezionato, carica le sue relazioni per impostare org e commessa
+  useEffect(() => {
+    if (externalSelectedFile && !selectedOrg && !selectedCommessa && showFileFilter) {
+      console.log('CascadingFilters: Caricamento relazioni per file pre-selezionato', externalSelectedFile)
+      getFileOrigineWithRelations(externalSelectedFile)
+        .then(fileWithRelations => {
+          if (fileWithRelations.commessa && fileWithRelations.organizzazione) {
+            console.log('CascadingFilters: Impostazione automatica org e commessa da file', {
+              orgId: fileWithRelations.organizzazione.id,
+              commessaId: fileWithRelations.commessa.id
+            })
+            setSelectedOrg(fileWithRelations.organizzazione.id)
+            setSelectedCommessa(fileWithRelations.commessa.id)
+            onOrgChange?.(fileWithRelations.organizzazione.id)
+            onCommessaChange?.(fileWithRelations.commessa.id)
+          }
+        })
+        .catch(error => {
+          console.error('CascadingFilters: Errore caricamento relazioni file:', error)
+        })
+    }
+  }, [externalSelectedFile, selectedOrg, selectedCommessa, showFileFilter, onOrgChange, onCommessaChange])
 
   const handleOrgChange = (orgId: number | undefined) => {
     console.log('CascadingFilters: Cambio organizzazione', orgId)

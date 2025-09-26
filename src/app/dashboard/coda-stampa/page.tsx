@@ -81,8 +81,7 @@ export default function CodaStampaPage() {
     try {
       // Carica ordini
       const ordersList = await listOrders({ 
-        organizzazione_id: isSuperuser ? orgId : orgId, 
-        isSuperuser 
+        organizzazione_id: isSuperuser ? orgId : orgId
       })
       
       // Filtra solo ordini in coda
@@ -105,8 +104,8 @@ export default function CodaStampaPage() {
       
       setOrders(sortedCodaOrders)
       
-      // Carica i G-code per tutti gli ordini
-      const gcodeIds = [...new Set(codaOrders.map(o => o.gcode_id))]
+      // Carica i G-code per tutti gli ordini (solo quelli con gcode_id non null)
+      const gcodeIds = [...new Set(codaOrders.map(o => o.gcode_id).filter(id => id !== null))] as number[]
       const gcodeMap = new Map<number, Gcode>()
       
       for (const gcodeId of gcodeIds) {
@@ -124,17 +123,40 @@ export default function CodaStampaPage() {
       setGcodes(gcodeMap)
 
       // Carica file origine associati agli ordini
-      const fileOrigineIds: number[] = []
-      for (const gcodeId of gcodeIds) {
-        const gcode = gcodeMap.get(gcodeId)
-        if (gcode && gcode.file_origine_id) {
-          fileOrigineIds.push(gcode.file_origine_id)
+      // Se file_origine_id non esiste, usa gcode per recuperare file_origine_id
+      const fileOrigineIds = new Set<number>()
+      
+      // Prima prova a usare file_origine_id se esiste
+      codaOrders.forEach(o => {
+        if (o.file_origine_id) {
+          fileOrigineIds.add(o.file_origine_id)
+        }
+      })
+      
+      // Se non abbiamo file_origine_id, recupera dai gcode
+      if (fileOrigineIds.size === 0) {
+        const gcodeIds = [...new Set(codaOrders.map(o => o.gcode_id).filter(id => id !== null))] as number[]
+        if (gcodeIds.length > 0) {
+          try {
+            const gcodeList = await listGcode({ file_origine_id: undefined })
+            gcodeIds.forEach(gcodeId => {
+              const gcode = gcodeList.find(g => g.id === gcodeId)
+              if (gcode) {
+                fileOrigineIds.add(gcode.file_origine_id)
+              }
+            })
+          } catch (err) {
+            console.error('Errore caricamento gcode per file origine:', err)
+          }
         }
       }
-      const fileOrigineArr = await listFileOrigineByIds([...new Set(fileOrigineIds)])
-      const fileMap = new Map<number, FileOrigine>()
-      fileOrigineArr.forEach(f => fileMap.set(f.id, f))
-      setFileOrigineMap(fileMap)
+      
+      if (fileOrigineIds.size > 0) {
+        const fileOrigineArr = await listFileOrigineByIds([...fileOrigineIds])
+        const fileMap = new Map<number, FileOrigine>()
+        fileOrigineArr.forEach(f => fileMap.set(f.id, f))
+        setFileOrigineMap(fileMap)
+      }
 
       setError(null)
     } catch (err) {
@@ -202,7 +224,16 @@ export default function CodaStampaPage() {
   const codaData = orders
     .filter(order => ['in_coda', 'in_stampa', 'pronto'].includes(order.stato))
     .map(order => {
-      const gcode = gcodes.get(order.gcode_id)
+      const gcode = order.gcode_id ? gcodes.get(order.gcode_id) : undefined
+      
+      // Prova a ottenere file_origine da file_origine_id o da gcode
+      let fileOrigine = undefined
+      if (order.file_origine_id) {
+        fileOrigine = fileOrigineMap.get(order.file_origine_id)
+      } else if (gcode) {
+        fileOrigine = fileOrigineMap.get(gcode.file_origine_id)
+      }
+      
       const commessa = commesse.find(c => c.id === order.commessa_id)
       const organizzazione = orgs.find(o => o.id === order.organizzazione_id)
       
@@ -210,6 +241,7 @@ export default function CodaStampaPage() {
         ...order,
         stato: order.stato as CodaStampaStato,
         gcode: gcode ? [gcode] : [],
+        file_origine: fileOrigine ? [fileOrigine] : [],
         commessa: commessa ? [commessa] : [],
         organizzazione: organizzazione ? [organizzazione] : []
       }

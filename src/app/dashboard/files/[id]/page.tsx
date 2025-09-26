@@ -283,7 +283,11 @@ export default function FileDetailPage() {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><b>Nome file:</b> {file.nome_file.split('/').pop() || file.nome_file}</div>
+                <div><b>Nome file:</b> 
+                  <div className="max-w-xs truncate inline-block" title={file.nome_file.split('/').pop() || file.nome_file}>
+                    {file.nome_file.split('/').pop() || file.nome_file}
+                  </div>
+                </div>
                 <div><b>Commessa:</b> {commessa ? commessa.nome : file.commessa_id}</div>
                 <div><b>Organizzazione:</b> {org ? org.nome : '-'}</div>
                 <div><b>Data caricamento:</b> {new Date(file.data_caricamento).toLocaleDateString()}</div>
@@ -331,7 +335,7 @@ export default function FileDetailPage() {
                             {editingGcodeOrderId === o.id ? (
                               <div className="flex items-center gap-2">
                                 <select
-                                  value={inlineGcodeValue ?? o.gcode_id}
+                                  value={inlineGcodeValue ?? (o.gcode_id || '')}
                                   onChange={e => setInlineGcodeValue(Number(e.target.value) || undefined)}
                                   className="select select-bordered select-xs"
                                   disabled={inlineGcodeLoading}
@@ -360,9 +364,10 @@ export default function FileDetailPage() {
                             ) : (
                               <button
                                 className="link link-primary text-sm"
-                                onClick={() => { setEditingGcodeOrderId(o.id); setInlineGcodeValue(o.gcode_id) }}
+                                 onClick={() => { setEditingGcodeOrderId(o.id); setInlineGcodeValue(o.gcode_id || undefined) }}
                               >
                                 {(() => {
+                                  if (!o.gcode_id) return 'Nessun G-code'
                                   const g = gcodes.find(g => g.id === o.gcode_id)
                                   return g ? (g.nome_file.split('/').pop() || g.nome_file) : `G-code ${o.gcode_id}`
                                 })()}

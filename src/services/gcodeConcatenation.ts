@@ -100,7 +100,7 @@ export async function findConcatenationCandidates(
     await updateGcodesWithoutPrinterInfo()
     
     // Carica ordini in coda
-    const ordersList = await listOrders({ isSuperuser: true })
+    const ordersList = await listOrders({ })
     
     const codaOrders = ordersList.filter(o => ['in_coda', 'in_stampa', 'pronto', 'error'].includes(o.stato))
     
@@ -109,7 +109,7 @@ export async function findConcatenationCandidates(
     }
     
     // Carica relazioni necessarie
-    const gcodeIds = [...new Set(codaOrders.map(o => o.gcode_id))]
+    const gcodeIds = [...new Set(codaOrders.map(o => o.gcode_id).filter(id => id !== null))] as number[]
     const commessaIds = [...new Set(codaOrders.map(o => o.commessa_id))]
     const organizzazioneIds = [...new Set(codaOrders.map(o => o.organizzazione_id))]
     
@@ -127,7 +127,12 @@ export async function findConcatenationCandidates(
     const groupedByPrinter = new Map<string, Ordine[]>()
     
     for (const order of codaOrders) {
-      const gcode = gcodeMap.get(order.gcode_id)
+      if (!order.gcode_id) {
+        console.log('⚠️ Ordine senza G-code associato:', order.id)
+        continue
+      }
+      if (!order.gcode_id) continue
+const gcode = gcodeMap.get(order.gcode_id)
       if (!gcode) {
         console.log('⚠️ G-code non trovato:', order.gcode_id)
         continue
@@ -153,7 +158,9 @@ export async function findConcatenationCandidates(
     
     for (const order of codaOrders) {
       if (order.quantita > 1) {
-        const gcode = gcodeMap.get(order.gcode_id)
+        if (!order.gcode_id) continue
+        if (!order.gcode_id) continue
+const gcode = gcodeMap.get(order.gcode_id)
         if (!gcode) continue
         
         const printerName = gcode.stampante || 'Unknown Printer'
@@ -194,6 +201,7 @@ export async function findConcatenationCandidates(
         const materialGroups = new Map<string, Ordine[]>()
         
         for (const item of items) {
+          if (!item.gcode_id) continue
           const gcode = gcodeMap.get(item.gcode_id)
           if (!gcode) continue
           
@@ -212,7 +220,7 @@ export async function findConcatenationCandidates(
             if (totalQuantity > 1) {
               const candidate: ConcatenationCandidate = {
                 ordineIds: materialItems.map(item => item.id).filter(id => id > 0),
-                gcodeIds: materialItems.map(item => item.gcode_id),
+                gcodeIds: materialItems.map(item => item.gcode_id).filter(id => id !== null) as number[],
                 stampanteId: 'Unknown Printer',
                 materialName: materialKey,
                 printSettingsName: 'Automatic Profile',
@@ -226,10 +234,12 @@ export async function findConcatenationCandidates(
                 candidates: [candidate],
                 description: `${totalQuantity}x items - ${materialKey} - Unknown Printer`,
                 estimatedTime: materialItems.reduce((sum, item) => {
+                  if (!item.gcode_id) return sum
                   const gcode = gcodeMap.get(item.gcode_id)
                   return sum + (gcode?.tempo_stampa_min || 0) * item.quantita
                 }, 0),
                 estimatedMaterial: materialItems.reduce((sum, item) => {
+                  if (!item.gcode_id) return sum
                   const gcode = gcodeMap.get(item.gcode_id)
                   return sum + (gcode?.peso_grammi || 0) * item.quantita
                 }, 0)
@@ -245,6 +255,7 @@ export async function findConcatenationCandidates(
       const sameGcodeGroups = new Map<number, Ordine[]>()
       
       for (const item of items) {
+        if (!item.gcode_id) continue
         const gcodeId = item.gcode_id
         if (!sameGcodeGroups.has(gcodeId)) {
           sameGcodeGroups.set(gcodeId, [])
@@ -287,6 +298,7 @@ export async function findConcatenationCandidates(
       const materialGroups = new Map<string, Ordine[]>()
       
       for (const item of items) {
+        if (!item.gcode_id) continue
         const gcode = gcodeMap.get(item.gcode_id)
         if (!gcode) {
           continue
@@ -312,7 +324,7 @@ export async function findConcatenationCandidates(
             const materialName = materialKey.split('_')[0]
             const candidate: ConcatenationCandidate = {
               ordineIds: materialItems.map(item => item.id).filter(id => id > 0),
-              gcodeIds: materialItems.map(item => item.gcode_id),
+              gcodeIds: materialItems.map(item => item.gcode_id).filter(id => id !== null) as number[],
               stampanteId: printerName,
               materialName: materialName,
               printSettingsName: 'Automatic Profile',
@@ -326,11 +338,13 @@ export async function findConcatenationCandidates(
               candidates: [candidate],
               description: `${totalQuantity}x items - ${materialName} - ${printerName}`,
               estimatedTime: materialItems.reduce((sum, item) => {
-                const gcode = gcodeMap.get(item.gcode_id)
+                if (!item.gcode_id) return sum
+const gcode = gcodeMap.get(item.gcode_id)
                 return sum + (gcode?.tempo_stampa_min || 0) * item.quantita
               }, 0),
               estimatedMaterial: materialItems.reduce((sum, item) => {
-                const gcode = gcodeMap.get(item.gcode_id)
+                if (!item.gcode_id) return sum
+const gcode = gcodeMap.get(item.gcode_id)
                 return sum + (gcode?.peso_grammi || 0) * item.quantita
               }, 0)
             })
@@ -349,7 +363,8 @@ export async function findConcatenationCandidates(
       const allMaterialGroups = new Map<string, Ordine[]>()
       
       for (const order of codaOrders) {
-        const gcode = gcodeMap.get(order.gcode_id)
+        if (!order.gcode_id) continue
+const gcode = gcodeMap.get(order.gcode_id)
         if (!gcode) continue
         
         const materialKey = gcode.materiale || 'unknown'
@@ -369,7 +384,7 @@ export async function findConcatenationCandidates(
           if (totalQuantity > 1) {
             const candidate: ConcatenationCandidate = {
               ordineIds: materialItems.map(item => item.id).filter(id => id > 0),
-              gcodeIds: materialItems.map(item => item.gcode_id),
+              gcodeIds: materialItems.map(item => item.gcode_id).filter(id => id !== null) as number[],
               stampanteId: 'General',
               materialName: materialKey,
               printSettingsName: 'Automatic Profile',
@@ -383,11 +398,13 @@ export async function findConcatenationCandidates(
               candidates: [candidate],
               description: `${totalQuantity}x items - ${materialKey} - General`,
               estimatedTime: materialItems.reduce((sum, item) => {
-                const gcode = gcodeMap.get(item.gcode_id)
+                if (!item.gcode_id) return sum
+const gcode = gcodeMap.get(item.gcode_id)
                 return sum + (gcode?.tempo_stampa_min || 0) * item.quantita
               }, 0),
               estimatedMaterial: materialItems.reduce((sum, item) => {
-                const gcode = gcodeMap.get(item.gcode_id)
+                if (!item.gcode_id) return sum
+const gcode = gcodeMap.get(item.gcode_id)
                 return sum + (gcode?.peso_grammi || 0) * item.quantita
               }, 0)
             })
