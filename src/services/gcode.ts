@@ -76,7 +76,9 @@ export async function uploadGcode(
       gcodeMetadata = await extractGcodeMetadata(file)
     }
     
+    console.log('🔥 [GCODE SERVICE] Chiamando analyzeGcodeFile...')
     gcodeAnalysis = await analyzeGcodeFile(file)
+    console.log('🔥 [GCODE SERVICE] analyzeGcodeFile completato, risultato:', gcodeAnalysis)
   } catch (error) {
     // Continua senza analisi se fallisce
   }
@@ -184,8 +186,20 @@ export async function updateGcodeAnalysis(id: number): Promise<void> {
     // Determina il nome del file dallo storage path
     const fileName = gcode.nome_file.split('/').pop() || 'temp.gcode'
     
+    // Determina il MIME type basato sull'estensione del file
+    const lowerFileName = fileName.toLowerCase()
+    let mimeType = 'text/plain' // default
+    
+    if (lowerFileName.endsWith('.gcode.3mf')) {
+      mimeType = 'application/zip'
+    } else if (lowerFileName.endsWith('.gcode') || lowerFileName.endsWith('.g') || lowerFileName.endsWith('.nc')) {
+      mimeType = 'text/plain'
+    } else if (lowerFileName.endsWith('.3mf')) {
+      mimeType = 'application/zip'
+    }
+    
     // Converti il blob in File per l'analisi
-    const file = new File([fileData], fileName, { type: 'text/plain' })
+    const file = new File([fileData], fileName, { type: mimeType })
     
     // Analizza il file usando la nuova logica che distingue tra .gcode e .gcode.3mf
     const analysis = await analyzeGcodeFile(file)

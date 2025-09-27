@@ -63,7 +63,7 @@ export function useUser() {
     fetchUser()
 
     // Ascolta i cambiamenti di autenticazione
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: any) => {
       if (event === 'SIGNED_OUT') {
         setUser(null)
         setLoading(false)

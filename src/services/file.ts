@@ -14,13 +14,13 @@ export async function listCommesse(): Promise<string[]> {
 
   // 1.2) Deduplica le coppie in memoria
   const seen = new Set<string>()
-  const uniquePairs = rows!.filter(r => {
+  const uniquePairs = rows!.filter((r: any) => {
     const key = `${r.organizzazione_id}:${r.commessa}`
     return seen.has(key) ? false : (seen.add(key), true)
   })
 
   // 1.3) Prendi tutti gli organizzazione_id unici
-  const orgIds = Array.from(new Set(uniquePairs.map(r => r.organizzazione_id)))
+  const orgIds = Array.from(new Set(uniquePairs.map((r: any) => r.organizzazione_id)))
 
   // 1.4) Preleva i nomi di quelle organizzazioni
   const { data: orgs, error: orgErr } = await supabase
@@ -31,11 +31,11 @@ export async function listCommesse(): Promise<string[]> {
 
   // 1.5) Mappa id → clean nome
   const mapOrg = new Map(
-    orgs!.map(o => [o.id, o.nome.replace(/\s+/g, '_').toLowerCase()])
+    orgs!.map((o: any) => [o.id, o.nome.replace(/\s+/g, '_').toLowerCase()])
   )
 
   // 1.6) Costruisci e ritorna gli string path “organizzazione/commessa”
-  return uniquePairs.map(r => {
+  return uniquePairs.map((r: any) => {
     const orgName = mapOrg.get(r.organizzazione_id) ?? 'unknown'
     return `${orgName}/${r.commessa}`
   })

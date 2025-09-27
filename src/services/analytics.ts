@@ -105,7 +105,7 @@ export async function getAnalyticsData(filters: FilterOptions = {}): Promise<Ana
     const timeStats = await getTimeStats(period, deliveredOrders)
 
     // Statistiche stampanti
-    const printerStats = stampanti.map(stampante => {
+    const printerStats = stampanti.map((stampante: any) => {
       const ordersForPrinter = deliveredOrders.filter(o => 
         o.gcode && o.gcode[0] && o.gcode[0].stampante === stampante.nome
       )
@@ -125,16 +125,16 @@ export async function getAnalyticsData(filters: FilterOptions = {}): Promise<Ana
 
     // Top performers
     const topPerformers = printerStats
-      .sort((a, b) => b.ordersCompleted - a.ordersCompleted)
+      .sort((a: any, b: any) => b.ordersCompleted - a.ordersCompleted)
       .slice(0, 3)
-      .map(printer => ({
+      .map((printer: any) => ({
         printer: printer.nome,
         orders: printer.ordersCompleted,
         efficiency: printer.successRate
       }))
 
     // Statistiche stampanti attive
-    const activePrinters = stampanti.filter(s => s.stato === 'attiva').length
+    const activePrinters = stampanti.filter((s: any) => s.stato === 'attiva').length
     const totalPrinters = stampanti.length
 
     return {
@@ -232,7 +232,7 @@ async function listStampanti({ userId, isSuperuser = false }: { userId?: number,
   const haPrinters = haResponse.success ? haResponse.printers : []
   
   // Combina i dati come nella pagina stampanti
-  const stampantiCompletate = dbStampanti.map(stampante => {
+  const stampantiCompletate = dbStampanti.map((stampante: any) => {
     const haData = haPrinters.find((p: PrinterState) => p.unique_id === stampante.unique_id)
     if (haData) {
       return {

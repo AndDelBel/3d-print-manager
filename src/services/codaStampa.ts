@@ -62,7 +62,7 @@ export async function listCodaStampaWithRelations({
   }
 
   // Ordina per priorità: consegna_richiesta (priorità 1), data_ordine (priorità 2)
-  const sortedData = (data || []).sort((a, b) => {
+  const sortedData = (data || []).sort((a: any, b: any) => {
     // Se entrambi hanno consegna_richiesta, ordina per quella
     if (a.consegna_richiesta && b.consegna_richiesta) {
       return new Date(a.consegna_richiesta).getTime() - new Date(b.consegna_richiesta).getTime()

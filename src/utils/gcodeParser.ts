@@ -308,7 +308,8 @@ export async function extractGcodeMetadata(file: File): Promise<GcodeMetadata> {
  * Analizza un file G-code per estrarre informazioni
  */
 export async function analyzeGcodeFile(file: File): Promise<GcodeAnalysis> {
-  console.log('🔍 [ANALYZE] Inizio analisi file:', file.name, 'tipo:', file.type, 'dimensione:', file.size)
+  console.log('🚀🚀🚀 [ANALYZE] VERSIONE AGGIORNATA 2.0 - FUNZIONE CHIAMATA! 🚀🚀🚀')
+  console.log('🚀 [ANALYZE] VERSIONE AGGIORNATA 2.0 - Inizio analisi file:', file.name, 'tipo:', file.type, 'dimensione:', file.size)
   
   const analysis: GcodeAnalysis = {
     totalLines: 0,
@@ -331,6 +332,7 @@ export async function analyzeGcodeFile(file: File): Promise<GcodeAnalysis> {
     const lowerName = file.name.toLowerCase()
     console.log('🔍 [ANALYZE] Nome file normalizzato:', lowerName)
     
+    // Check if it's a .gcode.3mf file (ZIP format)
     if (lowerName.endsWith('.gcode.3mf')) {
       console.log('🔍 [ANALYZE] Rilevato file .gcode.3mf, apro come ZIP...')
       // Apri lo ZIP e cerca il plate gcode
@@ -441,10 +443,35 @@ export async function analyzeGcodeFile(file: File): Promise<GcodeAnalysis> {
         }
       }
     } else {
-      console.log('🔍 [ANALYZE] File .gcode classico, leggo direttamente')
-      // File .gcode classico
-      text = await file.text()
-      console.log('🔍 [ANALYZE] Contenuto gcode caricato, lunghezza:', text.length)
+      // Handle all other gcode file formats (.gcode, .g, .nc, .3mf, etc.)
+      console.log('🔍 [ANALYZE] File gcode standard, leggo direttamente come testo')
+      
+      try {
+        // Read the file as text - this works for most gcode files
+        text = await file.text()
+        console.log('🔍 [ANALYZE] Contenuto gcode caricato, lunghezza:', text.length)
+        
+        // Validate that this looks like gcode content
+        if (text.length === 0) {
+          console.log('⚠️ [ANALYZE] File vuoto')
+          analysis.warnings.push('Il file è vuoto')
+        } else {
+          // Check if the content looks like gcode
+          const gcodeIndicators = ['G0', 'G1', 'G28', 'M104', 'M140', 'M190', 'M109', ';', 'F', 'X', 'Y', 'Z', 'E']
+          const hasGcodeContent = gcodeIndicators.some(indicator => text.includes(indicator))
+          
+          if (!hasGcodeContent) {
+            console.log('⚠️ [ANALYZE] Il contenuto non sembra essere G-code valido')
+            analysis.warnings.push('Il file potrebbe non essere un G-code valido')
+          } else {
+            console.log('✅ [ANALYZE] Contenuto G-code valido rilevato')
+          }
+        }
+      } catch (error) {
+        console.log('❌ [ANALYZE] Impossibile leggere il file come testo:', error)
+        analysis.errors.push('Impossibile leggere il contenuto del file')
+        return analysis
+      }
     }
     const lines = text.split('\n')
     analysis.totalLines = lines.length
@@ -452,11 +479,15 @@ export async function analyzeGcodeFile(file: File): Promise<GcodeAnalysis> {
 
     for (const line of lines) {
       const trimmedLine = line.trim().toUpperCase()
+      const originalLine = line.trim()
       
       // Tempo di stampa (diverse etichette possibili)
-      if (trimmedLine.includes(';TIME:') || trimmedLine.includes(';PRINT_TIME:') || trimmedLine.includes(';ESTIMATED_TIME:') || trimmedLine.includes('MODEL PRINTING TIME:')) {
+      if (trimmedLine.includes(';TIME:') || trimmedLine.includes(';PRINT_TIME:') || trimmedLine.includes(';ESTIMATED_TIME:') || 
+          trimmedLine.includes('MODEL PRINTING TIME:') || trimmedLine.includes(';PRINTING TIME:') || 
+          trimmedLine.includes(';TOTAL PRINT TIME:') || trimmedLine.includes(';ESTIMATED PRINT TIME:')) {
+        
         // Formato Bambu: ; model printing time: 49m 17s; total estimated time: 51m 4s
-        const bambuMatch = line.match(/model printing time:\s*(\d+)m\s*(\d+)s/i)
+        const bambuMatch = originalLine.match(/model printing time:\s*(\d+)m\s*(\d+)s/i)
         if (bambuMatch) {
           const minutes = parseInt(bambuMatch[1])
           const seconds = parseInt(bambuMatch[2])
@@ -464,31 +495,81 @@ export async function analyzeGcodeFile(file: File): Promise<GcodeAnalysis> {
           analysis.tempo_stampa_min = minutes
           console.log('✅ [ANALYZE] Tempo trovato nel G-code (Bambu):', analysis.printTime, 'sec,', analysis.tempo_stampa_min, 'min')
         } else {
-          // Formato standard
-          const match = line.match(/;(?:TIME|PRINT_TIME|ESTIMATED_TIME):\s*(\d+)/i)
-          if (match) {
-            analysis.printTime = parseInt(match[1])
+          // Formato PrusaSlicer: ; estimated printing time (normal mode) = 9h 22m 15s
+          const prusaMatch = originalLine.match(/estimated printing time.*?=\s*(\d+)h\s*(\d+)m\s*(\d+)s/i)
+          if (prusaMatch) {
+            const hours = parseInt(prusaMatch[1])
+            const minutes = parseInt(prusaMatch[2])
+            const seconds = parseInt(prusaMatch[3])
+            analysis.printTime = hours * 3600 + minutes * 60 + seconds
             analysis.tempo_stampa_min = Math.ceil(analysis.printTime / 60)
-            console.log('✅ [ANALYZE] Tempo trovato nel G-code (standard):', analysis.printTime, 'sec,', analysis.tempo_stampa_min, 'min')
+            console.log('✅ [ANALYZE] Tempo trovato nel G-code (PrusaSlicer):', analysis.printTime, 'sec,', analysis.tempo_stampa_min, 'min')
+          } else {
+            // Formato Cura: ;TIME:1234
+            const curaMatch = originalLine.match(/;TIME:\s*(\d+)/i)
+            if (curaMatch) {
+              analysis.printTime = parseInt(curaMatch[1])
+              analysis.tempo_stampa_min = Math.ceil(analysis.printTime / 60)
+              console.log('✅ [ANALYZE] Tempo trovato nel G-code (Cura):', analysis.printTime, 'sec,', analysis.tempo_stampa_min, 'min')
+            } else {
+              // Formato generico con ore e minuti: 9h 22m
+              const timeMatch = originalLine.match(/(\d+)h\s*(\d+)m/i)
+              if (timeMatch) {
+                const hours = parseInt(timeMatch[1])
+                const minutes = parseInt(timeMatch[2])
+                analysis.printTime = hours * 3600 + minutes * 60
+                analysis.tempo_stampa_min = hours * 60 + minutes
+                console.log('✅ [ANALYZE] Tempo trovato nel G-code (ore/min):', analysis.printTime, 'sec,', analysis.tempo_stampa_min, 'min')
+              } else {
+                // Formato standard con secondi
+                const match = originalLine.match(/;(?:TIME|PRINT_TIME|ESTIMATED_TIME):\s*(\d+)/i)
+                if (match) {
+                  analysis.printTime = parseInt(match[1])
+                  analysis.tempo_stampa_min = Math.ceil(analysis.printTime / 60)
+                  console.log('✅ [ANALYZE] Tempo trovato nel G-code (standard):', analysis.printTime, 'sec,', analysis.tempo_stampa_min, 'min')
+                }
+              }
+            }
           }
         }
       }
       
       // Filamento utilizzato (diverse etichette possibili)
-      if (trimmedLine.includes(';FILAMENT_USED') || trimmedLine.includes(';FILAMENT_WEIGHT') || trimmedLine.includes('TOTAL FILAMENT WEIGHT')) {
+      if (trimmedLine.includes(';FILAMENT_USED') || trimmedLine.includes(';FILAMENT_WEIGHT') || trimmedLine.includes('TOTAL FILAMENT WEIGHT') ||
+          trimmedLine.includes(';FILAMENT LENGTH:') || trimmedLine.includes(';TOTAL FILAMENT LENGTH:') || trimmedLine.includes(';FILAMENT [G]:')) {
+        
         // Formato Bambu: ; total filament weight [g] : 44.18
-        const bambuMatch = line.match(/total filament weight\s*\[g\]\s*:\s*([\d.]+)/i)
+        const bambuMatch = originalLine.match(/total filament weight\s*\[g\]\s*:\s*([\d.]+)/i)
         if (bambuMatch) {
           analysis.filamentUsed = parseFloat(bambuMatch[1])
           analysis.peso_grammi = Math.round(analysis.filamentUsed)
           console.log('✅ [ANALYZE] Filamento trovato nel G-code (Bambu):', analysis.filamentUsed, 'g,', analysis.peso_grammi, 'g')
         } else {
-          // Formato standard
-          const match = line.match(/;(?:FILAMENT_USED|FILAMENT_WEIGHT):\s*([\d.]+)/i)
-          if (match) {
-            analysis.filamentUsed = parseFloat(match[1])
+          // Formato PrusaSlicer: ; filament used [g] = 15.23
+          const prusaMatch = originalLine.match(/filament used\s*\[g\]\s*=\s*([\d.]+)/i)
+          if (prusaMatch) {
+            analysis.filamentUsed = parseFloat(prusaMatch[1])
             analysis.peso_grammi = Math.round(analysis.filamentUsed)
-            console.log('✅ [ANALYZE] Filamento trovato nel G-code (standard):', analysis.filamentUsed, 'g,', analysis.peso_grammi, 'g')
+            console.log('✅ [ANALYZE] Filamento trovato nel G-code (PrusaSlicer):', analysis.filamentUsed, 'g,', analysis.peso_grammi, 'g')
+          } else {
+            // Formato Cura: ;Filament used: 1.75m
+            const curaLengthMatch = originalLine.match(/;Filament used:\s*([\d.]+)m/i)
+            if (curaLengthMatch) {
+              // Stima approssimativa: 1.75mm diametro, densità PLA ~1.24 g/cm³
+              const lengthM = parseFloat(curaLengthMatch[1])
+              const estimatedWeight = lengthM * 1000 * Math.PI * (1.75/2) * (1.75/2) * 1.24
+              analysis.filamentUsed = estimatedWeight
+              analysis.peso_grammi = Math.round(estimatedWeight)
+              console.log('✅ [ANALYZE] Filamento stimato dal G-code (Cura):', analysis.filamentUsed, 'g,', analysis.peso_grammi, 'g')
+            } else {
+              // Formato standard
+              const match = originalLine.match(/;(?:FILAMENT_USED|FILAMENT_WEIGHT|FILAMENT \[G\]):\s*([\d.]+)/i)
+              if (match) {
+                analysis.filamentUsed = parseFloat(match[1])
+                analysis.peso_grammi = Math.round(analysis.filamentUsed)
+                console.log('✅ [ANALYZE] Filamento trovato nel G-code (standard):', analysis.filamentUsed, 'g,', analysis.peso_grammi, 'g')
+              }
+            }
           }
         }
       }
@@ -524,8 +605,9 @@ export async function analyzeGcodeFile(file: File): Promise<GcodeAnalysis> {
       }
       
       // Modello stampante
-      if (trimmedLine.includes(';PRINTER_MODEL:') || trimmedLine.includes(';PRINTER:')) {
-        const match = line.match(/;(?:PRINTER_MODEL|PRINTER):\s*([^;\n]+)/i)
+      if (trimmedLine.includes(';PRINTER_MODEL:') || trimmedLine.includes(';PRINTER:') || 
+          trimmedLine.includes(';GENERATED BY:') || trimmedLine.includes(';PRINTER_MANUFACTURER:')) {
+        const match = originalLine.match(/;(?:PRINTER_MODEL|PRINTER|GENERATED BY|PRINTER_MANUFACTURER):\s*([^;\n]+)/i)
         if (match) {
           analysis.printerModel = match[1].trim()
           analysis.stampante = match[1].trim()
@@ -534,12 +616,140 @@ export async function analyzeGcodeFile(file: File): Promise<GcodeAnalysis> {
       }
       
       // Tipo materiale
-      if (trimmedLine.includes(';MATERIAL:') || trimmedLine.includes(';MATERIAL_NAME:')) {
-        const match = line.match(/;(?:MATERIAL|MATERIAL_NAME):\s*([^;\n]+)/i)
+      if (trimmedLine.includes(';MATERIAL:') || trimmedLine.includes(';MATERIAL_NAME:') || 
+          trimmedLine.includes(';FILAMENT_TYPE:') || trimmedLine.includes(';FILAMENT MATERIAL:')) {
+        const match = originalLine.match(/;(?:MATERIAL|MATERIAL_NAME|FILAMENT_TYPE|FILAMENT MATERIAL):\s*([^;\n]+)/i)
         if (match) {
           analysis.materialType = match[1].trim()
           analysis.materiale = match[1].trim()
           console.log('✅ [ANALYZE] Materiale trovato nel G-code:', analysis.materialType)
+        }
+      }
+      
+      // Rimuovo l'estrazione del materiale dal contenuto gcode per evitare falsi positivi
+      // Il materiale verrà estratto solo dal nome del file nel fallback
+    }
+
+    console.log('🔥 [ANALYZE] ===== FINE PARSING PRINCIPALE, INIZIO FALLBACK =====')
+    console.log('🔥 [ANALYZE] Stato attuale - Tempo:', analysis.printTime, 'Filamento:', analysis.filamentUsed, 'Materiale:', analysis.materialType, 'Stampante:', analysis.printerModel)
+
+    // Fallback: estrai informazioni dal nome del file se non trovate nel gcode
+    console.log('🔥 [ANALYZE] ===== FALLBACK MATERIALE INIZIATO =====')
+    console.log('🔍 [ANALYZE] Controllo parsing materiale dal nome file...')
+    if (!analysis.materialType) {
+      const fileName = file.name.toLowerCase()
+      console.log('🔍 [ANALYZE] Nome file per materiale:', fileName)
+      if (fileName.includes('petg')) {
+        analysis.materialType = 'PETG'
+        analysis.materiale = 'PETG'
+        console.log('✅ [ANALYZE] Materiale estratto dal nome file (fallback):', analysis.materialType)
+      } else if (fileName.includes('pla')) {
+        analysis.materialType = 'PLA'
+        analysis.materiale = 'PLA'
+        console.log('✅ [ANALYZE] Materiale estratto dal nome file (fallback):', analysis.materialType)
+      } else if (fileName.includes('abs')) {
+        analysis.materialType = 'ABS'
+        analysis.materiale = 'ABS'
+        console.log('✅ [ANALYZE] Materiale estratto dal nome file (fallback):', analysis.materialType)
+      } else {
+        console.log('⚠️ [ANALYZE] Nessun materiale trovato nel nome file')
+      }
+    } else {
+      console.log('ℹ️ [ANALYZE] Materiale già trovato, salto parsing nome file')
+    }
+    
+    // Fallback: estrai tempo dal nome del file se non trovato nel gcode
+    console.log('🔥 [ANALYZE] ===== FALLBACK TEMPO INIZIATO =====')
+    console.log('🔍 [ANALYZE] Controllo parsing nome file...')
+    if (!analysis.printTime) {
+      const fileName = file.name.toLowerCase()
+      console.log('🔍 [ANALYZE] Nome file per parsing:', fileName)
+      // Cerca pattern come "9h22m", "9h 22m", "9:22", "9h22"
+      const timeMatch = fileName.match(/(\d+)h\s*(\d+)m?/i)
+      if (timeMatch) {
+        const hours = parseInt(timeMatch[1])
+        const minutes = parseInt(timeMatch[2])
+        analysis.printTime = hours * 3600 + minutes * 60
+        analysis.tempo_stampa_min = hours * 60 + minutes
+        console.log('✅ [ANALYZE] Tempo estratto dal nome file (fallback):', analysis.printTime, 'sec,', analysis.tempo_stampa_min, 'min')
+      } else {
+        console.log('⚠️ [ANALYZE] Nessun pattern tempo trovato nel nome file')
+      }
+    } else {
+      console.log('ℹ️ [ANALYZE] Tempo già trovato, salto parsing nome file')
+    }
+    
+    // Fallback: cerca metadata alla fine del file (formato PrusaSlicer moderno)
+    // Controlla sempre la fine del file per metadata più precisi
+    console.log('🔥 [ANALYZE] ===== FALLBACK END-OF-FILE INIZIATO =====')
+    console.log('🔍 [ANALYZE] Cercando metadata alla fine del file...')
+    console.log('🔍 [ANALYZE] Totale righe file:', lines.length)
+    
+    // Prendi le ultime 1000 righe per cercare metadata
+    const endLines = lines.slice(-1000)
+    console.log('🔍 [ANALYZE] Righe da analizzare alla fine:', endLines.length)
+    
+    for (const line of endLines) {
+      const trimmedLine = line.trim().toUpperCase()
+      const originalLine = line.trim()
+      
+      // Tempo stampa alla fine del file (sovrascrive quello del filename se più preciso)
+      if (trimmedLine.includes('ESTIMATED PRINTING TIME')) {
+        const prusaMatch = originalLine.match(/estimated printing time.*?=\s*(\d+)h\s*(\d+)m\s*(\d+)s/i)
+        if (prusaMatch) {
+          const hours = parseInt(prusaMatch[1])
+          const minutes = parseInt(prusaMatch[2])
+          const seconds = parseInt(prusaMatch[3])
+          analysis.printTime = hours * 3600 + minutes * 60 + seconds
+          analysis.tempo_stampa_min = Math.ceil(analysis.printTime / 60)
+          console.log('✅ [ANALYZE] Tempo trovato alla fine del file:', analysis.printTime, 'sec,', analysis.tempo_stampa_min, 'min')
+        }
+      }
+      
+      // Filamento alla fine del file
+      if (trimmedLine.includes('TOTAL FILAMENT USED [G]')) {
+        const match = originalLine.match(/total filament used\s*\[g\]\s*=\s*([\d.]+)/i)
+        if (match) {
+          analysis.filamentUsed = parseFloat(match[1])
+          analysis.peso_grammi = Math.round(analysis.filamentUsed)
+          console.log('✅ [ANALYZE] Filamento trovato alla fine del file:', analysis.filamentUsed, 'g,', analysis.peso_grammi, 'g')
+        }
+      }
+      
+      // Stampante alla fine del file
+      if (trimmedLine.includes('PRINTER_MODEL')) {
+        const match = originalLine.match(/printer_model\s*=\s*([^;\n]+)/i)
+        if (match) {
+          analysis.printerModel = match[1].trim()
+          analysis.stampante = match[1].trim()
+          console.log('✅ [ANALYZE] Stampante trovata alla fine del file:', analysis.printerModel)
+        }
+      }
+      
+      // Altezza layer alla fine del file
+      if (trimmedLine.includes('LAYER_HEIGHT')) {
+        const match = originalLine.match(/layer_height\s*=\s*([\d.]+)/i)
+        if (match) {
+          analysis.layerHeight = parseFloat(match[1])
+          console.log('✅ [ANALYZE] Layer height trovato alla fine del file:', analysis.layerHeight)
+        }
+      }
+      
+      // Temperatura alla fine del file
+      if (trimmedLine.includes('FIRST_LAYER_TEMPERATURE')) {
+        const match = originalLine.match(/first_layer_temperature\s*=\s*(\d+)/i)
+        if (match) {
+          analysis.temperature = parseInt(match[1])
+          console.log('✅ [ANALYZE] Temperatura trovata alla fine del file:', analysis.temperature)
+        }
+      }
+      
+      // Temperatura piatto alla fine del file
+      if (trimmedLine.includes('BED_TEMPERATURE')) {
+        const match = originalLine.match(/bed_temperature\s*=\s*(\d+)/i)
+        if (match) {
+          analysis.bedTemperature = parseInt(match[1])
+          console.log('✅ [ANALYZE] Temperatura piatto trovata alla fine del file:', analysis.bedTemperature)
         }
       }
     }

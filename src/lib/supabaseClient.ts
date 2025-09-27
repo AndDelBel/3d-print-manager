@@ -13,6 +13,11 @@ let supabaseAdminInstance: SupabaseClient | null = null
 
 export const supabase = (() => {
   if (!supabaseInstance) {
+    // Check if we're in browser environment to avoid multiple instances
+    if (typeof window !== 'undefined' && (window as any).__supabaseClient) {
+      return (window as any).__supabaseClient;
+    }
+    
     supabaseInstance = createClient(supabaseUrl, supabaseKey, {
       auth: {
         autoRefreshToken: true,
@@ -25,7 +30,12 @@ export const supabase = (() => {
           'X-Client-Info': 'supabase-js/2.x'
         }
       }
-    })
+    });
+    
+    // Store in window for browser environment to prevent multiple instances
+    if (typeof window !== 'undefined') {
+      (window as any).__supabaseClient = supabaseInstance;
+    }
   }
   return supabaseInstance
 })()

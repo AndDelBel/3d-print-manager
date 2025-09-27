@@ -49,6 +49,7 @@ export function Navbar() {
                       <li><Link href="/dashboard/organization" onClick={() => setIsMobileMenuOpen(false)}>Organizzazioni</Link></li>
                       <li><Link href="/dashboard/stampanti" onClick={() => setIsMobileMenuOpen(false)}>Stampanti</Link></li>
                       <li><Link href="/dashboard/analytics" onClick={() => setIsMobileMenuOpen(false)}>Analytics</Link></li>
+                      <li><Link href="/dashboard/admin" onClick={() => setIsMobileMenuOpen(false)}>🛠️ Admin</Link></li>
                     </>
                   )}
                 </>
@@ -100,6 +101,11 @@ export function Navbar() {
                   <li>
                     <Link href="/dashboard/analytics" className={isActive('/dashboard/analytics') ? 'active' : ''}>
                       Analytics
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/dashboard/admin" className={isActive('/dashboard/admin') ? 'active' : ''}>
+                      🛠️ Admin
                     </Link>
                   </li>
                 </>

@@ -64,7 +64,7 @@ export async function createOrder(
   }
 
   // Crea l'oggetto per l'inserimento - rimuovi file_origine_id se la colonna non esiste
-  const row: any = {
+  const row: Record<string, unknown> = {
     gcode_id,
     commessa_id: fileOrigine.commessa_id,
     organizzazione_id: orgId,
@@ -265,15 +265,30 @@ export async function migrateOrdineTable(): Promise<void> {
 }
 
 export async function listOrdersByFileOrigine(file_origine_id: number): Promise<Ordine[]> {
-  // Query per ottenere ordini associati a un file_origine
-  const { data, error } = await supabase
-    .from('ordine')
-    .select('*')
-    .eq('file_origine_id', file_origine_id)
-    .order('data_ordine', { ascending: false });
-  
-  if (error) throw error;
-  return data || [];
+  // Validate input parameter
+  if (!file_origine_id || isNaN(file_origine_id)) {
+    console.warn('Invalid file_origine_id provided:', file_origine_id);
+    return [];
+  }
+
+  try {
+    // Query per ottenere ordini associati a un file_origine
+    const { data, error } = await supabase
+      .from('ordine')
+      .select('*')
+      .eq('file_origine_id', file_origine_id)
+      .order('data_ordine', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching orders by file_origine_id:', error);
+      throw error;
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error('Error in listOrdersByFileOrigine:', error);
+    throw error;
+  }
 }
 
 export async function getOrder(id: number): Promise<Ordine | null> {
