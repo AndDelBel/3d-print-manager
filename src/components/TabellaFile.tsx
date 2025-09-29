@@ -22,7 +22,17 @@ export function TabellaFile({ righe, showOrganizzazione = true, isSuperuser = fa
     if (riga.id) {
       params.set('file', riga.id.toString())
     }
-    return `/dashboard/orders/create?${params.toString()}`
+    const url = `/dashboard/orders/create?${params.toString()}`
+    
+    // Debug logging per produzione
+    console.log('TabellaFile: Generated order URL', {
+      rigaId: riga.id,
+      orgId: riga.organizzazione_id,
+      commessaId: riga.commessa_id,
+      generatedUrl: url
+    })
+    
+    return url
   }
   
   return (

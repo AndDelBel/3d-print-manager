@@ -15,6 +15,10 @@ function CreateOrderContent() {
   const searchParams = useSearchParams()
   const { loading, user } = useUser()
 
+  // Version identifier for debugging
+  const VERSION = '1.0.1-fix-order-params'
+  console.log('CreateOrderContent: Component version', VERSION)
+
   const [selectedOrg, setSelectedOrg] = useState<number | undefined>(undefined)
   const [selectedCommessa, setSelectedCommessa] = useState<number | undefined>(undefined)
   const [selectedFile, setSelectedFile] = useState<number | undefined>(undefined)
@@ -35,13 +39,25 @@ function CreateOrderContent() {
       const commessaParam = searchParams.get('commessa')
       const fileParam = searchParams.get('file')
 
+      // Debug logging per produzione
+      console.log('CreateOrderContent: URL parameters received', {
+        org: orgParam,
+        commessa: commessaParam,
+        file: fileParam,
+        fullUrl: window.location.href,
+        searchParams: searchParams.toString()
+      })
+
       if (orgParam) {
+        console.log('CreateOrderContent: Setting organization', Number(orgParam))
         setSelectedOrg(Number(orgParam))
       }
       if (commessaParam) {
+        console.log('CreateOrderContent: Setting commessa', Number(commessaParam))
         setSelectedCommessa(Number(commessaParam))
       }
       if (fileParam) {
+        console.log('CreateOrderContent: Setting file', Number(fileParam))
         setSelectedFile(Number(fileParam))
       }
     }
