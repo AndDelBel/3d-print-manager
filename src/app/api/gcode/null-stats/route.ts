@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseClient'
-import { createClient } from '@supabase/supabase-js'
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,20 +12,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const token = authHeader.split(' ')[1]
-    
-    // Crea un client Supabase con il token per verificare l'utente
-    const supabaseWithToken = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        global: {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      }
-    )
+    // Usa il client admin centralizzato
+    const supabaseWithToken = supabaseAdmin
     
     // Verifica che l'utente sia autenticato
     const { data: userData, error: userError } = await supabaseWithToken.auth.getUser()

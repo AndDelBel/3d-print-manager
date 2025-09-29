@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { supabaseAdmin } from '@/lib/supabaseClient'
 import { analyzeGcodeFile } from '@/utils/gcodeParser'
 
 export async function POST(request: NextRequest) {
@@ -13,20 +13,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const token = authHeader.split(' ')[1]
-    
-    // Crea un client Supabase con il token per verificare l'utente
-    const supabaseWithToken = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        global: {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      }
-    )
+    // Usa il client admin centralizzato
+    const supabaseWithToken = supabaseAdmin
     
     // Verifica che l'utente sia autenticato
     const { data: userData, error: userError } = await supabaseWithToken.auth.getUser()

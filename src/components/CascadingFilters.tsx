@@ -20,6 +20,7 @@ interface CascadingFiltersProps {
   showFileFilter?: boolean
   disabled?: boolean
   className?: string
+  urlParamsProcessed?: boolean
 }
 
 export function CascadingFilters({
@@ -33,7 +34,8 @@ export function CascadingFilters({
   onFileChange,
   showFileFilter = false,
   disabled = false,
-  className = ''
+  className = '',
+  urlParamsProcessed = false
 }: CascadingFiltersProps) {
   const [orgs, setOrgs] = useState<Organizzazione[]>([])
   const [selectedOrg, setSelectedOrg] = useState<number | undefined>(externalSelectedOrg)
@@ -170,8 +172,9 @@ export function CascadingFilters({
   }, [selectedCommessa, isSuperuser, showFileFilter, onFileChange, externalSelectedFile, selectedFile])
 
   // Se un file è pre-selezionato, carica le sue relazioni per impostare org e commessa
+  // SOLO se non sono già stati impostati via URL parameters
   useEffect(() => {
-    if (externalSelectedFile && !selectedOrg && !selectedCommessa && showFileFilter) {
+    if (externalSelectedFile && !selectedOrg && !selectedCommessa && showFileFilter && !urlParamsProcessed) {
       console.log('CascadingFilters: Caricamento relazioni per file pre-selezionato', externalSelectedFile)
       getFileOrigineWithRelations(externalSelectedFile)
         .then(fileWithRelations => {
@@ -190,7 +193,7 @@ export function CascadingFilters({
           console.error('CascadingFilters: Errore caricamento relazioni file:', error)
         })
     }
-  }, [externalSelectedFile, selectedOrg, selectedCommessa, showFileFilter, onOrgChange, onCommessaChange])
+  }, [externalSelectedFile, showFileFilter, urlParamsProcessed, selectedOrg, selectedCommessa, onOrgChange, onCommessaChange])
 
   const handleOrgChange = (orgId: number | undefined) => {
     console.log('CascadingFilters: Cambio organizzazione', orgId)

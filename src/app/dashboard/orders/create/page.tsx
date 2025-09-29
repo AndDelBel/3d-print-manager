@@ -29,6 +29,7 @@ function CreateOrderContent() {
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
   const [tableExists, setTableExists] = useState<boolean | null>(null)
+  const [urlParamsProcessed, setUrlParamsProcessed] = useState(false)
 
   const isSuperuser = user?.is_superuser
 
@@ -60,6 +61,9 @@ function CreateOrderContent() {
         console.log('CreateOrderContent: Setting file', Number(fileParam))
         setSelectedFile(Number(fileParam))
       }
+      
+      // Mark URL parameters as processed to prevent CascadingFilters auto-loading
+      setUrlParamsProcessed(true)
     }
   }, [loading, user, searchParams])
 
@@ -175,6 +179,7 @@ function CreateOrderContent() {
           onFileChange={setSelectedFile}
           showFileFilter={true}
           disabled={saving}
+          urlParamsProcessed={urlParamsProcessed}
         />
 
         {/* Quantità */}
