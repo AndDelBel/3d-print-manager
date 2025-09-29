@@ -63,49 +63,33 @@ export async function createOrder(
     orgId = commessa.organizzazione_id
   }
 
-  // Crea l'oggetto per l'inserimento - rimuovi file_origine_id se la colonna non esiste
-  const row: Record<string, unknown> = {
-    gcode_id,
+  // Se non c'è un G-code, crea uno provvisorio per mantenere il riferimento al file
+  let finalGcodeId = gcode_id
+  if (!finalGcodeId) {
+    const { createProvisionalGcode } = await import('@/services/gcode')
+    finalGcodeId = await createProvisionalGcode(file_origine_id)
+  }
+
+  // Crea l'oggetto per l'inserimento
+  const row = {
+    gcode_id: finalGcodeId,
     commessa_id: fileOrigine.commessa_id,
     organizzazione_id: orgId,
     quantita,
-    stato: 'processamento',
+    stato: 'processamento' as const,
     data_ordine: new Date().toISOString(),
     user_id: uid,
     consegna_richiesta: data_consegna ?? null,
     note: note ?? null,
   }
 
-  // Prova ad aggiungere file_origine_id solo se la colonna esiste
-  try {
-    // Prima prova a inserire con file_origine_id
-    const rowWithFileOrigine = { ...row, file_origine_id }
-    const { error } = await supabase
-      .from('ordine')
-      .insert([rowWithFileOrigine])
-      .select()
-    
-    if (error) {
-      // Se fallisce, prova senza file_origine_id (per compatibilità con schema vecchio)
-      if (error.message.includes('file_origine_id')) {
-        const { error: fallbackError } = await supabase
-          .from('ordine')
-          .insert([row])
-          .select()
-        
-        if (fallbackError) {
-          throw new Error(`Errore inserimento ordine: ${fallbackError.message}`)
-        }
-      } else {
-        throw new Error(`Errore inserimento ordine: ${error.message}`)
-      }
-    }
-  } catch (err) {
-    if (err instanceof Error) {
-      throw err
-    } else {
-      throw new Error('Errore sconosciuto durante l\'inserimento dell\'ordine')
-    }
+  const { error } = await supabase
+    .from('ordine')
+    .insert([row])
+    .select()
+  
+  if (error) {
+    throw new Error(`Errore inserimento ordine: ${error.message}`)
   }
 }
 
@@ -315,7 +299,6 @@ export async function duplicateOrder(originalOrderId: number): Promise<number> {
   // Crea un nuovo ordine con gli stessi dati ma stato "in_coda" e note aggiornate
   const newOrder: Partial<Ordine> = {
     gcode_id: originalOrder.gcode_id,
-    file_origine_id: originalOrder.file_origine_id,
     commessa_id: originalOrder.commessa_id,
     organizzazione_id: originalOrder.organizzazione_id,
     user_id: originalOrder.user_id,

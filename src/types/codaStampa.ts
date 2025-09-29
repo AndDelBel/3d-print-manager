@@ -6,7 +6,6 @@ export interface OrdineInCoda {
   id: number;
   stato: CodaStampaStato;
   gcode_id: number | null;
-  file_origine_id?: number; // Opzionale per compatibilità
   commessa_id: number;
   organizzazione_id: number;
   user_id: string;

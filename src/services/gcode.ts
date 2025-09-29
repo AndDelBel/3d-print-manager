@@ -21,6 +21,43 @@ export async function listGcode({ file_origine_id }: { file_origine_id?: number 
   return data || [];
 }
 
+export async function createProvisionalGcode(file_origine_id: number): Promise<number> {
+  // Recupera utente
+  const { data: userData, error: userError } = await supabase.auth.getUser()
+  if (userError || !userData.user) throw userError || new Error('Utente non autenticato')
+  const userId = userData.user.id
+
+  // Recupera info file origine per creare un nome provvisorio
+  const { data: fileOrigine, error: fileErr } = await supabase
+    .from('file_origine')
+    .select('nome_file')
+    .eq('id', file_origine_id)
+    .single()
+  if (fileErr || !fileOrigine) throw fileErr || new Error('File origine non trovato')
+
+  // Crea un nome provvisorio per il G-code
+  const fileBaseName = fileOrigine.nome_file.split('/').pop()?.split('.')[0] || 'origine'
+  const provisionalName = `PROVVISORIO_${fileBaseName}_${Date.now()}.gcode`
+
+  // Crea il G-code provvisorio
+  const gcodeData = {
+    file_origine_id,
+    nome_file: provisionalName,
+    user_id: userId,
+    data_caricamento: new Date().toISOString(),
+    note: 'G-code provvisorio - da sostituire con il file reale'
+  }
+
+  const { data, error } = await supabase
+    .from('gcode')
+    .insert([gcodeData])
+    .select('id')
+    .single()
+  
+  if (error) throw error
+  return data.id
+}
+
 export async function uploadGcode(
   file: File,
   file_origine_id: number,
