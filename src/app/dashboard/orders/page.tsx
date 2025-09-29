@@ -97,31 +97,22 @@ export default function OrdersPage() {
           setGcodes(gcodeMap)
 
           // Carica file origine associati agli ordini
-          // Se file_origine_id non esiste, usa gcode per recuperare file_origine_id
+          // Recupera file_origine_id dai gcode associati agli ordini
           const fileOrigineIds = new Set<number>()
           
-          // Prima prova a usare file_origine_id se esiste
-          ordersList.forEach(o => {
-            if (o.file_origine_id) {
-              fileOrigineIds.add(o.file_origine_id)
-            }
-          })
-          
-          // Se non abbiamo file_origine_id, recupera dai gcode
-          if (fileOrigineIds.size === 0) {
-            const gcodeIds = [...new Set(ordersList.map(o => o.gcode_id).filter(id => id !== null))] as number[]
-            if (gcodeIds.length > 0) {
-              try {
-                const gcodeList = await listGcode({ file_origine_id: undefined })
-                gcodeIds.forEach(gcodeId => {
-                  const gcode = gcodeList.find(g => g.id === gcodeId)
-                  if (gcode) {
-                    fileOrigineIds.add(gcode.file_origine_id)
-                  }
-                })
-              } catch (err) {
-                console.error('Errore caricamento gcode per file origine:', err)
-              }
+          // Recupera dai gcode
+          const gcodeIdsForFiles = [...new Set(ordersList.map(o => o.gcode_id).filter(id => id !== null))] as number[]
+          if (gcodeIdsForFiles.length > 0) {
+            try {
+              const gcodeList = await listGcode({ file_origine_id: undefined })
+              gcodeIdsForFiles.forEach(gcodeId => {
+                const gcode = gcodeList.find(g => g.id === gcodeId)
+                if (gcode) {
+                  fileOrigineIds.add(gcode.file_origine_id)
+                }
+              })
+            } catch (err) {
+              console.error('Errore caricamento gcode per file origine:', err)
             }
           }
           
@@ -151,12 +142,7 @@ export default function OrdersPage() {
   }
 
   const getFileOrigine = (order: Ordine) => {
-    // Prima prova a usare file_origine_id se esiste
-    if (order.file_origine_id) {
-      return fileOrigineMap.get(order.file_origine_id)
-    }
-    
-    // Se non esiste, prova a recuperarlo dal gcode
+    // Recupera file_origine_id dal gcode associato all'ordine
     if (order.gcode_id) {
       const gcode = gcodes.get(order.gcode_id)
       if (gcode) {

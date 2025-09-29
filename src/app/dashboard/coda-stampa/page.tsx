@@ -123,31 +123,22 @@ export default function CodaStampaPage() {
       setGcodes(gcodeMap)
 
       // Carica file origine associati agli ordini
-      // Se file_origine_id non esiste, usa gcode per recuperare file_origine_id
+      // Recupera file_origine_id dai gcode associati agli ordini
       const fileOrigineIds = new Set<number>()
       
-      // Prima prova a usare file_origine_id se esiste
-      codaOrders.forEach(o => {
-        if (o.file_origine_id) {
-          fileOrigineIds.add(o.file_origine_id)
-        }
-      })
-      
-      // Se non abbiamo file_origine_id, recupera dai gcode
-      if (fileOrigineIds.size === 0) {
-        const gcodeIds = [...new Set(codaOrders.map(o => o.gcode_id).filter(id => id !== null))] as number[]
-        if (gcodeIds.length > 0) {
-          try {
-            const gcodeList = await listGcode({ file_origine_id: undefined })
-            gcodeIds.forEach(gcodeId => {
-              const gcode = gcodeList.find(g => g.id === gcodeId)
-              if (gcode) {
-                fileOrigineIds.add(gcode.file_origine_id)
-              }
-            })
-          } catch (err) {
-            console.error('Errore caricamento gcode per file origine:', err)
-          }
+      // Recupera dai gcode
+      const gcodeIdsForFiles = [...new Set(codaOrders.map(o => o.gcode_id).filter(id => id !== null))] as number[]
+      if (gcodeIdsForFiles.length > 0) {
+        try {
+          const gcodeList = await listGcode({ file_origine_id: undefined })
+          gcodeIdsForFiles.forEach(gcodeId => {
+            const gcode = gcodeList.find(g => g.id === gcodeId)
+            if (gcode) {
+              fileOrigineIds.add(gcode.file_origine_id)
+            }
+          })
+        } catch (err) {
+          console.error('Errore caricamento gcode per file origine:', err)
         }
       }
       
@@ -226,11 +217,9 @@ export default function CodaStampaPage() {
     .map(order => {
       const gcode = order.gcode_id ? gcodes.get(order.gcode_id) : undefined
       
-      // Prova a ottenere file_origine da file_origine_id o da gcode
+      // Prova a ottenere file_origine da gcode
       let fileOrigine = undefined
-      if (order.file_origine_id) {
-        fileOrigine = fileOrigineMap.get(order.file_origine_id)
-      } else if (gcode) {
+      if (gcode) {
         fileOrigine = fileOrigineMap.get(gcode.file_origine_id)
       }
       
