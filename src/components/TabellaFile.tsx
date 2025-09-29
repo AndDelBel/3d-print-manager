@@ -10,7 +10,20 @@ interface TabellaFileProps {
 }
 
 export function TabellaFile({ righe, showOrganizzazione = true, isSuperuser = false, onAssocia, ...callbacks }: TabellaFileProps) {
-  const getOrderUrl = () => '/dashboard/orders/create'
+  // Costruisci l'URL per la creazione ordini con parametri precompilati
+  const getOrderUrl = (riga: RigaFile) => {
+    const params = new URLSearchParams()
+    if (riga.organizzazione_id) {
+      params.set('org', riga.organizzazione_id.toString())
+    }
+    if (riga.commessa_id) {
+      params.set('commessa', riga.commessa_id.toString())
+    }
+    if (riga.id) {
+      params.set('file', riga.id.toString())
+    }
+    return `/dashboard/orders/create?${params.toString()}`
+  }
   
   return (
     <div className="w-full">
@@ -73,7 +86,7 @@ export function TabellaFile({ righe, showOrganizzazione = true, isSuperuser = fa
                   <div className="flex items-center gap-2">
                     <span className="badge badge-success">✓</span>
                     <Link 
-                      href={getOrderUrl()}
+                      href={getOrderUrl(riga)}
                       className="btn btn-primary btn-xs"
                       onClick={(e) => e.stopPropagation()}
                     >
