@@ -7,49 +7,42 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('Missing Supabase environment variables')
 }
 
-// Global variables to store instances
+// Singleton pattern per evitare multiple istanze
 let supabaseInstance: SupabaseClient | null = null
 let supabaseAdminInstance: SupabaseClient | null = null
 
-// Function to create client with proper configuration
-function createSupabaseClient() {
-  return createClient(supabaseUrl, supabaseKey, {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true,
-      // Use a unique storage key to avoid conflicts
-      storageKey: '3d-print-manager-supabase-auth'
-    },
-    global: {
-      headers: {
-        'X-Client-Info': 'supabase-js/2.x'
-      }
-    }
-  })
-}
-
-// Client for browser operations - singleton pattern
 export const supabase = (() => {
-  // In browser environment, check window first
-  if (typeof window !== 'undefined') {
-    if ((window as any).__supabaseClient) {
-      return (window as any).__supabaseClient
+  if (!supabaseInstance) {
+    // Check if we're in browser environment to avoid multiple instances
+    if (typeof window !== 'undefined' && (window as any).__supabaseClient) {
+      return (window as any).__supabaseClient;
     }
     
-    if (!supabaseInstance) {
-      supabaseInstance = createSupabaseClient()
-      // Store in window to prevent multiple instances
-      (window as any).__supabaseClient = supabaseInstance
+    supabaseInstance = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+        // Use a unique storage key to avoid conflicts
+        storageKey: '3d-print-manager-supabase-auth'
+      },
+      // Configurazione per evitare errori 404
+      global: {
+        headers: {
+          'X-Client-Info': 'supabase-js/2.x'
+        }
+      }
+    });
+    
+    // Store in window for browser environment to prevent multiple instances
+    if (typeof window !== 'undefined') {
+      (window as any).__supabaseClient = supabaseInstance;
     }
-    return supabaseInstance
   }
-  
-  // Server-side: create new instance each time
-  return createSupabaseClient()
+  return supabaseInstance
 })()
 
-// Admin client for server-side operations
+// Client per operazioni server-side
 export const supabaseAdmin = (() => {
   if (!supabaseAdminInstance) {
     supabaseAdminInstance = createClient(
