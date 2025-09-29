@@ -1,19 +1,26 @@
 'use client'
 
 import { useUser } from '@/hooks/useUser'
+import { AuthLoadingState } from '@/components/AuthLoadingState'
 import Link from 'next/link'
 
 
 export default function HomePage() {
-  const { loading, user } = useUser()
+  const { loading, user, error, retryCount } = useUser()
 
+  const handleRetry = () => {
+    window.location.reload()
+  }
 
-  if (loading) {
+  if (loading || error) {
     return (
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-center items-center min-h-[400px]">
-          <span className="loading loading-spinner loading-lg"></span>
-        </div>
+        <AuthLoadingState 
+          loading={loading}
+          error={error}
+          retryCount={retryCount}
+          onRetry={handleRetry}
+        />
       </main>
     )
   }

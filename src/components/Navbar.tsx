@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabaseClient'
 import UserAvatar from './UserAvatar'
 
 export function Navbar() {
-  const { user, loading } = useUser()
+  const { user, loading, error } = useUser()
   const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
@@ -118,6 +118,11 @@ export function Navbar() {
       <div className="navbar-end">
         {loading ? (
           <span className="loading loading-spinner loading-sm"></span>
+        ) : error ? (
+          <div className="text-error text-sm">
+            <span className="loading loading-spinner loading-xs mr-1"></span>
+            Errore
+          </div>
         ) : user ? (
           <div className="dropdown dropdown-end">
             <div tabIndex={0} role="button" className="btn btn-ghost btn-circle avatar">
