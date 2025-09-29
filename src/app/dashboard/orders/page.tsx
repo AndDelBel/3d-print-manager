@@ -74,9 +74,21 @@ export default function OrdersPage() {
   // Carica ordini
   useEffect(() => {
     if (!loading) {
+      console.log('OrdersPage: Loading orders with params', { 
+        isSuperuser, 
+        orgId, 
+        organizzazione_id: isSuperuser ? undefined : orgId 
+      })
+      
       listOrders({ organizzazione_id: isSuperuser ? undefined : orgId })
         .then(async (ordersList) => {
+          console.log('OrdersPage: Loaded orders', ordersList.length, ordersList)
           setOrders(ordersList)
+          
+          // Debug: Check if we have any orders at all
+          if (ordersList.length === 0) {
+            console.log('OrdersPage: No orders found in database')
+          }
           
           // Carica i G-code per tutti gli ordini (solo quelli con gcode_id non null)
           const gcodeIds = [...new Set(ordersList.map(o => o.gcode_id).filter(id => id !== null))] as number[]
@@ -123,7 +135,9 @@ export default function OrdersPage() {
             setFileOrigineMap(fileMap)
           }
         })
-        .catch(console.error)
+        .catch(err => {
+          console.error('OrdersPage: Error loading orders:', err)
+        })
     }
   }, [loading, orgId, isSuperuser])
 
@@ -191,25 +205,45 @@ export default function OrdersPage() {
 
   // Filtro per organizzazione e commessa
   const filtered = useMemo(
-    () => textFiltered.filter(o => {
-      // Filtro per organizzazione
-      if (orgId) {
-        if (o.organizzazione_id !== orgId) return false
-      } else if (!isSuperuser && orgs.length > 0) {
-        // Per utenti non superuser senza organizzazione selezionata, 
-        // mostra solo ordini delle loro organizzazioni
-        const orgIds = orgs.map(o => o.id)
-        if (!orgIds.includes(o.organizzazione_id)) return false
+    () => {
+      // Se non abbiamo ancora caricato i dati utente, mostra tutti gli ordini
+      if (loading || isSuperuser === undefined) {
+        return textFiltered
       }
       
-      // Filtro per commessa
-      if (filterComm) {
-        if (String(o.commessa_id) !== filterComm) return false
-      }
+      const result = textFiltered.filter(o => {
+        // Filtro per organizzazione
+        if (orgId) {
+          if (o.organizzazione_id !== orgId) return false
+        } else if (!isSuperuser && orgs.length > 0) {
+          // Per utenti non superuser senza organizzazione selezionata, 
+          // mostra solo ordini delle loro organizzazioni
+          const orgIds = orgs.map(o => o.id)
+          if (!orgIds.includes(o.organizzazione_id)) return false
+        }
+        
+        // Filtro per commessa
+        if (filterComm) {
+          if (String(o.commessa_id) !== filterComm) return false
+        }
+        
+        return true
+      })
       
-      return true
-    }),
-    [textFiltered, orgId, filterComm, isSuperuser, orgs]
+      console.log('OrdersPage: Filtering results', {
+        totalOrders: orders.length,
+        textFiltered: textFiltered.length,
+        filtered: result.length,
+        orgId,
+        isSuperuser,
+        orgsLength: orgs.length,
+        filterComm,
+        loading
+      })
+      
+      return result
+    },
+    [textFiltered, orgId, filterComm, isSuperuser, orgs, orders.length, loading]
   )
 
 

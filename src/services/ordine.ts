@@ -185,67 +185,12 @@ export async function createOrdineTable(): Promise<void> {
 }
 
 // Funzione per migrare la tabella ordine esistente
+// NOTA: Questa funzione è stata rimossa perché la colonna file_origine_id
+// non dovrebbe esistere nella tabella ordine. La relazione corretta è:
+// ordine -> gcode -> file_origine
 export async function migrateOrdineTable(): Promise<void> {
-  try {
-    // Prima controlla se la colonna file_origine_id esiste già
-    const checkColumnSql = `
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'ordine' AND column_name = 'file_origine_id';
-    `
-    
-    const { data: columnExists, error: checkError } = await supabase.rpc('exec_sql', { sql: checkColumnSql })
-    
-    if (checkError) {
-      console.error('Errore verifica colonna:', checkError)
-      throw checkError
-    }
-    
-    // Se la colonna non esiste, aggiungila
-    if (!columnExists || columnExists.length === 0) {
-      console.log('Aggiungendo colonna file_origine_id alla tabella ordine...')
-      
-      // Prima rendi gcode_id nullable
-      const makeGcodeNullableSql = `
-        ALTER TABLE ordine ALTER COLUMN gcode_id DROP NOT NULL;
-      `
-      
-      const { error: nullableError } = await supabase.rpc('exec_sql', { sql: makeGcodeNullableSql })
-      if (nullableError) {
-        console.warn('Errore rendendo gcode_id nullable:', nullableError)
-      }
-      
-      // Aggiungi la colonna file_origine_id
-      const addColumnSql = `
-        ALTER TABLE ordine ADD COLUMN file_origine_id INTEGER;
-      `
-      
-      const { error: addColumnError } = await supabase.rpc('exec_sql', { sql: addColumnSql })
-      if (addColumnError) {
-        console.error('Errore aggiunta colonna file_origine_id:', addColumnError)
-        throw addColumnError
-      }
-      
-      // Aggiungi la foreign key constraint
-      const addForeignKeySql = `
-        ALTER TABLE ordine 
-        ADD CONSTRAINT fk_ordine_file_origine 
-        FOREIGN KEY (file_origine_id) REFERENCES file_origine(id) ON DELETE CASCADE;
-      `
-      
-      const { error: fkError } = await supabase.rpc('exec_sql', { sql: addForeignKeySql })
-      if (fkError) {
-        console.warn('Errore aggiunta foreign key:', fkError)
-      }
-      
-      console.log('Migrazione tabella ordine completata!')
-    } else {
-      console.log('Colonna file_origine_id già presente nella tabella ordine')
-    }
-  } catch (error) {
-    console.error('Errore durante la migrazione:', error)
-    throw error
-  }
+  console.log('Migrazione ordine non necessaria - schema corretto già implementato')
+  return Promise.resolve()
 }
 
 export async function listOrdersByFileOrigine(file_origine_id: number): Promise<Ordine[]> {
@@ -256,11 +201,16 @@ export async function listOrdersByFileOrigine(file_origine_id: number): Promise<
   }
 
   try {
-    // Query per ottenere ordini associati a un file_origine
+    // Query per ottenere ordini associati a un file_origine tramite gcode
     const { data, error } = await supabase
       .from('ordine')
-      .select('*')
-      .eq('file_origine_id', file_origine_id)
+      .select(`
+        *,
+        gcode!inner(
+          file_origine_id
+        )
+      `)
+      .eq('gcode.file_origine_id', file_origine_id)
       .order('data_ordine', { ascending: false });
     
     if (error) {
