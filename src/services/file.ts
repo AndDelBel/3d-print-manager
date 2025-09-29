@@ -134,7 +134,7 @@ export async function listCommesseByOrg(orgId: number): Promise<string[]> {
   if (error) throw error
 
   // Deduplica in memoria
-  const commesse = rows?.map(r => r.commessa) || []
+  const commesse = rows?.map((r: { commessa: string }) => r.commessa) || []
   return Array.from(new Set(commesse))
 }
 

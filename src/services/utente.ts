@@ -26,7 +26,7 @@ export async function getUtentiByIds(user_ids: string[]): Promise<Map<string, Ut
   if (error) throw error
   
   const utentiMap = new Map<string, Utente>()
-  data?.forEach(utente => {
+  data?.forEach((utente: Utente) => {
     utentiMap.set(utente.id, utente)
   })
   

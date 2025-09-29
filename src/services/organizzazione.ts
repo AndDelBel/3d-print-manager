@@ -25,7 +25,7 @@ export async function listOrg({ userId, isSuperuser = false }: { userId?: string
   }
   
   // Poi carica le organizzazioni
-  const orgIds = userOrgs.map(org => org.organizzazione_id);
+  const orgIds = userOrgs.map((org: { organizzazione_id: number }) => org.organizzazione_id);
   const { data, error } = await supabase
     .from('organizzazione')
     .select('*')
@@ -81,5 +81,5 @@ export async function listUserOrgs(): Promise<Organizzazione[]> {
     .eq('user_id', userId)
 
   if (error) throw error
-  return data.map(row => row.organizzazione).flat();
+  return data.map((row: { organizzazione: any }) => row.organizzazione).flat();
 }
