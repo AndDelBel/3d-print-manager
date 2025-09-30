@@ -385,7 +385,7 @@ export default function FileDetailPage() {
                               </div>
                             ) : (
                               <button
-                                className="link link-primary text-sm"
+                                className="link link-primary text-sm max-w-[150px] truncate"
                                  onClick={() => { setEditingGcodeOrderId(o.id); setInlineGcodeValue(o.gcode_id || undefined) }}
                               >
                                 {(() => {
@@ -472,7 +472,7 @@ export default function FileDetailPage() {
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-3">
-                              <span className="font-medium">{g.nome_file.split('/').pop() || g.nome_file}</span>
+                              <span className="font-medium max-w-[550px] truncate" title={g.nome_file.split('/').pop() || g.nome_file}>{g.nome_file.split('/').pop() || g.nome_file}</span>
                               {mainGcodeId === g.id && (
                                 <span className="badge badge-success">
                                   Principale
