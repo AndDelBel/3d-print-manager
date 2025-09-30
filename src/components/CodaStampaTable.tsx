@@ -32,6 +32,24 @@ export function CodaStampaTable({ coda, isSuperuser, onStatusChange }: CodaStamp
     return new Date(dateString).toLocaleDateString('it-IT')
   }
 
+  const formatPrintTime = (minutes?: number) => {
+    if (!minutes) return '-'
+    const hours = Math.floor(minutes / 60)
+    const mins = minutes % 60
+    if (hours > 0) {
+      return `${hours}h ${mins}m`
+    }
+    return `${mins}m`
+  }
+
+  const formatFilamentWeight = (grams?: number) => {
+    if (!grams) return '-'
+    if (grams >= 1000) {
+      return `${(grams / 1000).toFixed(1)}kg`
+    }
+    return `${grams}g`
+  }
+
   const getStampanteDisplay = (gcode: { stampante?: string } | undefined) => {
     if (!gcode?.stampante) return 'N/A'
     return gcode.stampante
@@ -42,7 +60,7 @@ export function CodaStampaTable({ coda, isSuperuser, onStatusChange }: CodaStamp
       {/* Desktop Table View */}
       <div className="hidden md:block">
         <div className="overflow-x-auto overscroll-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200">
-          <table className="table table-zebra w-full min-w-[900px]">
+          <table className="table table-zebra w-full min-w-[1100px]">
         <thead>
           <tr>
             <th className="whitespace-nowrap">File</th>
@@ -50,11 +68,10 @@ export function CodaStampaTable({ coda, isSuperuser, onStatusChange }: CodaStamp
             <th className="whitespace-nowrap">Organizzazione</th>
             <th className="whitespace-nowrap">Stampante</th>
             <th className="whitespace-nowrap">Quantità</th>
+            <th className="whitespace-nowrap">Tempo Stampa</th>
+            <th className="whitespace-nowrap">Filamento</th>
             <th className="whitespace-nowrap">Stato</th>
             <th className="whitespace-nowrap">Consegna Richiesta</th>
-            <th className="whitespace-nowrap">Data Ordine</th>
-            <th className="whitespace-nowrap">Inizio Stampa</th>
-            <th className="whitespace-nowrap">Fine Stampa</th>
             <th className="whitespace-nowrap">Note</th>
           </tr>
         </thead>
@@ -68,7 +85,7 @@ export function CodaStampaTable({ coda, isSuperuser, onStatusChange }: CodaStamp
             return (
               <tr key={item.id}>
                 <td>
-                  <div className="max-w-xs truncate" title={gcode ? formatFileName(gcode.nome_file) : fileOrigine ? formatFileName(fileOrigine.nome_file) : 'N/A'}>
+                  <div className="max-w-[150px] truncate" title={gcode ? formatFileName(gcode.nome_file) : fileOrigine ? formatFileName(fileOrigine.nome_file) : 'N/A'}>
                     <div className="font-medium">
                       {gcode ? formatFileName(gcode.nome_file) : 
                        fileOrigine ? formatFileName(fileOrigine.nome_file) : 'N/A'}
@@ -96,6 +113,22 @@ export function CodaStampaTable({ coda, isSuperuser, onStatusChange }: CodaStamp
                 </td>
                 <td>{item.quantita}</td>
                 <td>
+                  <div className="font-medium">
+                    {formatPrintTime(gcode?.tempo_stampa_min)}
+                  </div>
+                  {!gcode && (
+                    <div className="text-sm opacity-70 text-warning">G-code richiesto</div>
+                  )}
+                </td>
+                <td>
+                  <div className="font-medium">
+                    {formatFilamentWeight(gcode?.peso_grammi)}
+                  </div>
+                  {!gcode && (
+                    <div className="text-sm opacity-70 text-warning">G-code richiesto</div>
+                  )}
+                </td>
+                <td>
                   {isSuperuser ? (
                     <button
                       onClick={() => onStatusChange(item)}
@@ -114,9 +147,6 @@ export function CodaStampaTable({ coda, isSuperuser, onStatusChange }: CodaStamp
                   )}
                 </td>
                 <td>{formatDate(item.consegna_richiesta || undefined)}</td>
-                <td>{formatDateTime(item.data_ordine)}</td>
-                <td>{formatDateTime(item.data_inizio || undefined)}</td>
-                <td>{formatDateTime(item.data_fine || undefined)}</td>
                 <td>
                   <div className="max-w-xs truncate" title={item.note || ''}>
                     {item.note || '-'}
@@ -170,6 +200,16 @@ export function CodaStampaTable({ coda, isSuperuser, onStatusChange }: CodaStamp
                   <div className="flex justify-between">
                     <span className="font-medium">Quantità:</span>
                     <span>{item.quantita}</span>
+                  </div>
+                  
+                  <div className="flex justify-between">
+                    <span className="font-medium">Tempo Stampa:</span>
+                    <span className="text-right">{formatPrintTime(gcode?.tempo_stampa_min)}</span>
+                  </div>
+                  
+                  <div className="flex justify-between">
+                    <span className="font-medium">Filamento:</span>
+                    <span className="text-right">{formatFilamentWeight(gcode?.peso_grammi)}</span>
                   </div>
                   
                   <div className="flex justify-between">

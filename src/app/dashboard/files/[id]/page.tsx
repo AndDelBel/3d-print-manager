@@ -17,7 +17,7 @@ import type { Utente } from '@/types/utente'
 import { AlertMessage } from '@/components/AlertMessage'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { FileEditModal } from '@/components/FileEditModal'
-import { updateOrderGcode } from '@/services/ordine'
+import { updateOrderGcode, updateOrderStatus } from '@/services/ordine'
 
 export default function FileDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -36,6 +36,9 @@ export default function FileDetailPage() {
   const [editingGcodeOrderId, setEditingGcodeOrderId] = useState<number | null>(null)
   const [inlineGcodeValue, setInlineGcodeValue] = useState<number | undefined>(undefined)
   const [inlineGcodeLoading, setInlineGcodeLoading] = useState(false)
+  const [editingStatusOrderId, setEditingStatusOrderId] = useState<number | null>(null)
+  const [inlineStatusValue, setInlineStatusValue] = useState<string | undefined>(undefined)
+  const [inlineStatusLoading, setInlineStatusLoading] = useState(false)
   const [canEdit, setCanEdit] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
 
@@ -205,6 +208,26 @@ export default function FileDetailPage() {
     }
   }
 
+  const handleInlineStatusChange = async (ordineId: number) => {
+    if (!inlineStatusValue) return
+    setInlineStatusLoading(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await updateOrderStatus(ordineId, inlineStatusValue as Ordine['stato'])
+      const updatedOrders = await listOrdersByFileOrigine(file!.id)
+      setOrders(updatedOrders)
+      setSuccess('Stato dell\'ordine aggiornato con successo!')
+      setEditingStatusOrderId(null)
+      setInlineStatusValue(undefined)
+    } catch (err) {
+      setError('Errore aggiornamento stato ordine')
+      console.error('Errore aggiornamento stato ordine:', err)
+    } finally {
+      setInlineStatusLoading(false)
+    }
+  }
+
   const handleEditSuccess = async () => {
     // Ricarica i dati del file
     if (id) {
@@ -320,7 +343,6 @@ export default function FileDetailPage() {
                       <th>Data</th>
                       {isSuperuser && <th>G-code</th>}
                       <th>Stato</th>
-                      {isSuperuser && <th>Azioni</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -376,21 +398,57 @@ export default function FileDetailPage() {
                           </td>
                         )}
                         <td>
-                          <span className={`badge ${
-                            o.stato === 'consegnato' ? 'badge-success' :
-                            o.stato === 'pronto' ? 'badge-info' :
-                            o.stato === 'in_stampa' ? 'badge-warning' :
-                            o.stato === 'in_coda' ? 'badge-primary' :
-                            'badge-neutral'
-                          }`}>
-                            {o.stato}
-                          </span>
+                          {isSuperuser && editingStatusOrderId === o.id ? (
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={inlineStatusValue ?? o.stato}
+                                onChange={e => setInlineStatusValue(e.target.value)}
+                                className="select select-bordered select-xs"
+                                disabled={inlineStatusLoading}
+                              >
+                                <option value="processamento">processamento</option>
+                                <option value="in_coda">in_coda</option>
+                                <option value="in_stampa">in_stampa</option>
+                                <option value="pronto">pronto</option>
+                                <option value="consegnato">consegnato</option>
+                                <option value="error">error</option>
+                              </select>
+                              <button
+                                className="btn btn-success btn-xs"
+                                onClick={() => handleInlineStatusChange(o.id)}
+                                disabled={inlineStatusLoading || !inlineStatusValue || inlineStatusValue === o.stato}
+                              >
+                                Salva
+                              </button>
+                              <button
+                                className="btn btn-ghost btn-xs"
+                                onClick={() => { setEditingStatusOrderId(null); setInlineStatusValue(undefined) }}
+                                disabled={inlineStatusLoading}
+                              >
+                                Annulla
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              className={`badge ${
+                                o.stato === 'consegnato' ? 'badge-success' :
+                                o.stato === 'pronto' ? 'badge-info' :
+                                o.stato === 'in_stampa' ? 'badge-warning' :
+                                o.stato === 'in_coda' ? 'badge-primary' :
+                                'badge-neutral'
+                              } ${isSuperuser ? 'cursor-pointer hover:opacity-80' : ''}`}
+                              onClick={() => {
+                                if (isSuperuser) {
+                                  setEditingStatusOrderId(o.id)
+                                  setInlineStatusValue(o.stato)
+                                }
+                              }}
+                              disabled={!isSuperuser}
+                            >
+                              {o.stato}
+                            </button>
+                          )}
                         </td>
-                        {isSuperuser && (
-                          <td className="border px-3 py-2">
-                            {/* Pulsante "Cambia G-code" rimosso */}
-                          </td>
-                        )}
                       </tr>
                     ))}
                   </tbody>
