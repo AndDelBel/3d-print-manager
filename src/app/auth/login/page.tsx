@@ -9,31 +9,54 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string|null>(null)
+  const [loading, setLoading] = useState(false)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
-    if (authError) {
-      setError(authError.message)
-      return
-    }
-
-    // Aggiorna/crea record tabella utente dopo login, così email/nome/cognome sono coerenti
+    setError(null)
+    setLoading(true)
+    
+    console.log('🔐 Attempting login...')
+    
     try {
-      const user = data.user
-      if (user?.id) {
-        const metadata = user.user_metadata as Record<string, unknown> | undefined
-        const nome = typeof metadata?.nome === 'string' ? metadata.nome : null
-        const cognome = typeof metadata?.cognome === 'string' ? metadata.cognome : null
-        await supabase
-          .from('utente')
-          .upsert({ id: user.id, email: user.email ?? null, nome, cognome }, { onConflict: 'id' })
+      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password })
+      
+      console.log('📡 Login response:', { data, authError })
+      
+      if (authError) {
+        console.error('❌ Login error:', authError)
+        setError(authError.message)
+        setLoading(false)
+        return
       }
-    } catch (e) {
-      console.error('Aggiornamento utente post-login fallito:', e)
-    }
 
-    router.push('/')
+      console.log('✅ Login successful, user:', data.user?.email)
+
+      // Aggiorna/crea record tabella utente dopo login, così email/nome/cognome sono coerenti
+      try {
+        const user = data.user
+        if (user?.id) {
+          console.log('👤 Updating user record in database...')
+          const metadata = user.user_metadata as Record<string, unknown> | undefined
+          const nome = typeof metadata?.nome === 'string' ? metadata.nome : null
+          const cognome = typeof metadata?.cognome === 'string' ? metadata.cognome : null
+          const result = await supabase
+            .from('utente')
+            .upsert({ id: user.id, email: user.email ?? null, nome, cognome }, { onConflict: 'id' })
+          
+          console.log('💾 User update result:', result)
+        }
+      } catch (e) {
+        console.error('⚠️ Aggiornamento utente post-login fallito:', e)
+      }
+
+      console.log('🔄 Redirecting to homepage...')
+      router.push('/')
+    } catch (err) {
+      console.error('💥 Unexpected error during login:', err)
+      setError('Si è verificato un errore imprevisto. Riprova.')
+      setLoading(false)
+    }
   }
 
   return (
@@ -64,8 +87,16 @@ export default function LoginPage() {
         <button
           type="submit"
           className="btn btn-primary w-full"
+          disabled={loading}
         >
-          Accedi
+          {loading ? (
+            <>
+              <span className="loading loading-spinner"></span>
+              Autenticazione in corso...
+            </>
+          ) : (
+            'Accedi'
+          )}
         </button>
       </form>
       <p className="mt-4 text-center text-base-content/70">

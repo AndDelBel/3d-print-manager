@@ -16,9 +16,10 @@ interface FileEditModalProps {
   onClose: () => void
   onSuccess: () => void
   isSuperuser: boolean
+  descriptionOnlyMode?: boolean
 }
 
-export function FileEditModal({ file, isOpen, onClose, onSuccess, isSuperuser }: FileEditModalProps) {
+export function FileEditModal({ file, isOpen, onClose, onSuccess, isSuperuser, descriptionOnlyMode = false }: FileEditModalProps) {
   const [commesse, setCommesse] = useState<Commessa[]>([])
   const [organizzazioni, setOrganizzazioni] = useState<Organizzazione[]>([])
   const [selectedCommessaId, setSelectedCommessaId] = useState<number>(file?.commessa_id || 0)
@@ -54,15 +55,22 @@ export function FileEditModal({ file, isOpen, onClose, onSuccess, isSuperuser }:
     setSuccess(null)
 
     try {
-      // Aggiorna i dati del file
-      await updateFileOrigine(file.id, {
-        commessa_id: selectedCommessaId,
-        descrizione: descrizione || null,
-      })
+      // In modalità solo descrizione, aggiorna solo la descrizione
+      if (descriptionOnlyMode) {
+        await updateFileOrigine(file.id, {
+          descrizione: descrizione || null,
+        })
+      } else {
+        // Aggiorna i dati del file
+        await updateFileOrigine(file.id, {
+          commessa_id: selectedCommessaId,
+          descrizione: descrizione || null,
+        })
 
-      // Se è stato selezionato un nuovo file, sostituiscilo
-      if (newFile) {
-        await replaceFileOrigine(file.id, newFile)
+        // Se è stato selezionato un nuovo file, sostituiscilo
+        if (newFile) {
+          await replaceFileOrigine(file.id, newFile)
+        }
       }
 
       setSuccess('File aggiornato con successo!')
@@ -91,6 +99,15 @@ export function FileEditModal({ file, isOpen, onClose, onSuccess, isSuperuser }:
       <div className="modal-box max-w-2xl">
         <h3 className="font-bold text-lg mb-4">Modifica File</h3>
         
+        {descriptionOnlyMode && (
+          <div className="alert alert-info mb-4">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>Puoi modificare solo la descrizione perché il file ha ordini con stato diverso da &quot;processamento&quot;</span>
+          </div>
+        )}
+        
         {error && <AlertMessage type="error" message={error} onClose={() => setError(null)} />}
         {success && <AlertMessage type="success" message={success} onClose={() => setSuccess(null)} />}
 
@@ -104,46 +121,50 @@ export function FileEditModal({ file, isOpen, onClose, onSuccess, isSuperuser }:
               <p><strong>Data caricamento:</strong> {new Date(file.data_caricamento).toLocaleDateString()}</p>
             </div>
 
-            {/* Sostituzione file */}
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text font-medium">Sostituisci File STL</span>
-              </label>
-              <input
-                type="file"
-                accept=".stl,.obj"
-                onChange={handleFileChange}
-                className="file-input file-input-bordered w-full"
-                disabled={loading}
-              />
-              <label className="label">
-                <span className="label-text-alt">Lascia vuoto per mantenere il file corrente</span>
-              </label>
-            </div>
+            {!descriptionOnlyMode && (
+              <>
+                {/* Sostituzione file */}
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text font-medium">Sostituisci File STL</span>
+                  </label>
+                  <input
+                    type="file"
+                    accept=".stl,.obj"
+                    onChange={handleFileChange}
+                    className="file-input file-input-bordered w-full"
+                    disabled={loading}
+                  />
+                  <label className="label">
+                    <span className="label-text-alt">Lascia vuoto per mantenere il file corrente</span>
+                  </label>
+                </div>
 
-            {/* Commessa */}
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text font-medium">Commessa</span>
-              </label>
-              <select
-                value={selectedCommessaId}
-                onChange={(e) => setSelectedCommessaId(Number(e.target.value))}
-                className="select select-bordered w-full"
-                disabled={loading}
-                required
-              >
-                <option value="">Seleziona commessa</option>
-                {commesse.map(commessa => {
-                  const org = organizzazioni.find(o => o.id === commessa.organizzazione_id)
-                  return (
-                    <option key={commessa.id} value={commessa.id}>
-                      {org ? `${org.nome} - ` : ''}{commessa.nome}
-                    </option>
-                  )
-                })}
-              </select>
-            </div>
+                {/* Commessa */}
+                <div className="form-control">
+                  <label className="label">
+                    <span className="label-text font-medium">Commessa</span>
+                  </label>
+                  <select
+                    value={selectedCommessaId}
+                    onChange={(e) => setSelectedCommessaId(Number(e.target.value))}
+                    className="select select-bordered w-full"
+                    disabled={loading}
+                    required
+                  >
+                    <option value="">Seleziona commessa</option>
+                    {commesse.map(commessa => {
+                      const org = organizzazioni.find(o => o.id === commessa.organizzazione_id)
+                      return (
+                        <option key={commessa.id} value={commessa.id}>
+                          {org ? `${org.nome} - ` : ''}{commessa.nome}
+                        </option>
+                      )
+                    })}
+                  </select>
+                </div>
+              </>
+            )}
 
             {/* Descrizione */}
             <div className="form-control">
