@@ -22,6 +22,11 @@ function getSupabaseClient(): SupabaseClient {
     return window.__supabaseClient
   }
   
+  // TypeScript needs to know these are strings (we already validated above)
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing Supabase environment variables')
+  }
+  
   // Create new instance only if needed
   const client = createClient(supabaseUrl, supabaseKey, {
     auth: {
@@ -52,6 +57,11 @@ function getSupabaseAdmin(): SupabaseClient {
   // Check window first for server-side client too
   if (typeof window !== 'undefined' && window.__supabaseAdmin) {
     return window.__supabaseAdmin
+  }
+  
+  // TypeScript needs to know these are strings
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing Supabase environment variables')
   }
   
   const adminClient = createClient(
