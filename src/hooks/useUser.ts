@@ -1,6 +1,5 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useRetryFetch } from '@/hooks/useRetryFetch'
 import { supabase } from '@/lib/supabaseClient'
 import type { Utente } from '@/types/utente'
 import type { Session } from '@supabase/supabase-js'
@@ -25,7 +24,7 @@ export function useUser() {
     isFetchingRef.current = true
     setError(null)
 
-    // Set a hard timeout ONLY on first load to prevent infinite loading
+    // Set a hard timeout ONLY on very first load to prevent infinite loading
     if (!hasInitialLoadRef.current) {
       // Clear any existing timeout first
       if (hardTimeoutRef.current) {
@@ -33,7 +32,8 @@ export function useUser() {
       }
       
       hardTimeoutRef.current = setTimeout(() => {
-        if (isFetchingRef.current && !user) {
+        // Only fire timeout if we're still fetching and haven't completed initial load
+        if (isFetchingRef.current && !hasInitialLoadRef.current) {
           console.warn('⏱️ Initial auth check timed out, assuming no session')
           setUser(null)
           setLoading(false)
@@ -114,14 +114,14 @@ export function useUser() {
       isFetchingRef.current = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [retryCount, user])
+  }, [retryCount])
 
-  // Retry automatico con intervalli più lunghi e limite massimo
-  useRetryFetch(loading, fetchUser, {
-    retryInterval: 2000, // 2 secondi
-    maxRetries: 1, // Solo 1 tentativo di retry
-    enabled: loading && retryCount < 1
-  })
+  // Retry automatico disabilitato - gestito da onAuthStateChange
+  // useRetryFetch(loading, fetchUser, {
+  //   retryInterval: 2000, // 2 secondi
+  //   maxRetries: 1, // Solo 1 tentativo di retry
+  //   enabled: loading && retryCount < 1
+  // })
 
   useEffect(() => {
     fetchUser()
@@ -147,7 +147,7 @@ export function useUser() {
     
     // Ascolta i cambiamenti di autenticazione
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: Session | null) => {
-      console.log('🔔 Auth state change:', event, session ? 'Session exists' : 'No session')
+      console.log('🔔 Auth state change:', event, session ? `Session exists for ${session.user.email}` : 'No session', 'current loading:', loading)
       
       // Clear any pending hard timeout when auth state changes
       if (hardTimeoutRef.current) {
@@ -161,6 +161,7 @@ export function useUser() {
       }
       
       if (event === 'SIGNED_OUT') {
+        console.log('🚪 SIGNED_OUT - clearing user')
         setUser(null)
         setLoading(false)
         setError(null)
@@ -208,13 +209,45 @@ export function useUser() {
         }
         
         // For SIGNED_IN or different user - fetch from DB
-        const { data, error } = await supabase
-          .from('utente')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
+        console.log('📥 Fetching user data for SIGNED_IN event')
+        setLoading(true)
         
-        if (error || !data) {
+        try {
+          // Add a timeout to prevent hanging
+          const fetchPromise = supabase
+            .from('utente')
+            .select('*')
+            .eq('id', session.user.id)
+            .single()
+          
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Database query timeout')), 5000)
+          )
+          
+          const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any
+          
+          if (error || !data) {
+            console.log('⚠️ User not in DB, using auth metadata. Error:', error)
+            const meta = session.user.user_metadata as Record<string, unknown> | undefined
+            setUser({
+              id: session.user.id,
+              email: session.user.email || '',
+              nome: typeof meta?.nome === 'string' ? meta.nome : '',
+              cognome: typeof meta?.cognome === 'string' ? meta.cognome : '',
+              created_at: new Date().toISOString(),
+              is_superuser: false,
+            })
+          } else {
+            console.log('✅ User data loaded from DB for SIGNED_IN')
+            setUser(data as Utente)
+          }
+          console.log('✅ SIGNED_IN complete - setting loading to false')
+          setLoading(false)
+          setError(null)
+          setRetryCount(0)
+        } catch (err) {
+          console.error('💥 Error fetching user data in SIGNED_IN:', err)
+          // Fallback to auth metadata on error
           const meta = session.user.user_metadata as Record<string, unknown> | undefined
           setUser({
             id: session.user.id,
@@ -224,12 +257,10 @@ export function useUser() {
             created_at: new Date().toISOString(),
             is_superuser: false,
           })
-        } else {
-          setUser(data as Utente)
+          setLoading(false)
+          setError(null)
+          setRetryCount(0)
         }
-        setLoading(false)
-        setError(null)
-        setRetryCount(0)
       }
     })
 

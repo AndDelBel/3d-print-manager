@@ -33,13 +33,22 @@ export default function FilesPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<FileOrigine | null>(null)
   const [gcodeMap, setGcodeMap] = useState<Map<number, Gcode[]>>(new Map())
+  
+  // Loading states for different data
+  const [orgsLoading, setOrgsLoading] = useState(false)
+  const [commesseLoading, setCommesseLoading] = useState(false)
+  const [filesLoading, setFilesLoading] = useState(false)
 
   const isSuperuser = user?.is_superuser
 
   // Carica organizzazioni
   useEffect(() => {
     if (!loading && user) {
-      listOrg({ userId: user.id, isSuperuser }).then(setOrgs).catch(console.error)
+      setOrgsLoading(true)
+      listOrg({ userId: user.id, isSuperuser })
+        .then(setOrgs)
+        .catch(console.error)
+        .finally(() => setOrgsLoading(false))
     }
   }, [loading, user, isSuperuser])
 
@@ -47,10 +56,14 @@ export default function FilesPage() {
 
   // Carica commesse
   useEffect(() => {
-    if (!loading) {
+    if (!loading && !orgsLoading) {
+      setCommesseLoading(true)
       if (isSuperuser) {
         // Per superuser, carica tutte le commesse
-        listCommesse({ isSuperuser }).then(setCommesse).catch(console.error)
+        listCommesse({ isSuperuser })
+          .then(setCommesse)
+          .catch(console.error)
+          .finally(() => setCommesseLoading(false))
       } else {
         // Per utenti non superuser, carica le commesse di tutte le loro organizzazioni
         if (orgs.length > 0) {
@@ -61,10 +74,13 @@ export default function FilesPage() {
               setCommesse(allCommesse)
             })
             .catch(console.error)
+            .finally(() => setCommesseLoading(false))
+        } else {
+          setCommesseLoading(false)
         }
       }
     }
-  }, [loading, isSuperuser, orgs])
+  }, [loading, isSuperuser, orgs, orgsLoading])
 
   // Reset commessa quando cambia organizzazione
   useEffect(() => {
@@ -74,21 +90,56 @@ export default function FilesPage() {
 
 
   const loadFiles = useCallback(async () => {
-    if (!loading) {
-      // Per utenti non superuser, carica i file delle loro organizzazioni
-      // Per superuser, carica tutti i file
-      if (isSuperuser) {
-        listFileOrigine({ isSuperuser })
-          .then(async (fileList) => {
-            setFiles(fileList)
+    if (!loading && !orgsLoading && !commesseLoading) {
+      setFilesLoading(true)
+      try {
+        // Per utenti non superuser, carica i file delle loro organizzazioni
+        // Per superuser, carica tutti i file
+        if (isSuperuser) {
+          const fileList = await listFileOrigine({ isSuperuser })
+          setFiles(fileList)
+          
+          // Carica i G-code per i file caricati
+          if (fileList.length > 0) {
+            try {
+              const results = await Promise.all(fileList.map(f => listGcode({ file_origine_id: f.id })))
+              // Mappa fileOrigine.id -> array di Gcode SOLO se almeno uno presente
+              const gcodeMap = new Map<number, Gcode[]>()
+              fileList.forEach((f, idx) => {
+                const arr = results[idx]
+                if (Array.isArray(arr) && arr.length > 0) {
+                  gcodeMap.set(f.id, arr)
+                }
+              })
+              setGcodeMap(gcodeMap)
+            } catch (error) {
+              console.error('Errore caricamento G-code:', error)
+              setGcodeMap(new Map())
+            }
+          } else {
+            setGcodeMap(new Map())
+          }
+        } else {
+          // Per utenti non superuser, carica i file delle loro organizzazioni
+          // Usa le organizzazioni già caricate
+          if (orgs.length > 0) {
+            const orgIds = orgs.map(o => o.id)
+            // Carica i file di tutte le organizzazioni dell'utente
+            const filePromises = orgIds.map(orgId => 
+              listFileOrigine({ organizzazione_id: orgId, isSuperuser })
+            )
+            
+            const fileResults = await Promise.all(filePromises)
+            const allFiles = fileResults.flat()
+            setFiles(allFiles)
             
             // Carica i G-code per i file caricati
-            if (fileList.length > 0) {
+            if (allFiles.length > 0) {
               try {
-                const results = await Promise.all(fileList.map(f => listGcode({ file_origine_id: f.id })))
+                const results = await Promise.all(allFiles.map(f => listGcode({ file_origine_id: f.id })))
                 // Mappa fileOrigine.id -> array di Gcode SOLO se almeno uno presente
                 const gcodeMap = new Map<number, Gcode[]>()
-                fileList.forEach((f, idx) => {
+                allFiles.forEach((f, idx) => {
                   const arr = results[idx]
                   if (Array.isArray(arr) && arr.length > 0) {
                     gcodeMap.set(f.id, arr)
@@ -102,52 +153,23 @@ export default function FilesPage() {
             } else {
               setGcodeMap(new Map())
             }
-          })
-          .catch(console.error)
-      } else {
-        // Per utenti non superuser, carica i file delle loro organizzazioni
-        // Usa le organizzazioni già caricate
-        if (orgs.length > 0) {
-          const orgIds = orgs.map(o => o.id)
-          // Carica i file di tutte le organizzazioni dell'utente
-          const filePromises = orgIds.map(orgId => 
-            listFileOrigine({ organizzazione_id: orgId, isSuperuser })
-          )
-          
-          Promise.all(filePromises)
-            .then(async (fileResults) => {
-              const allFiles = fileResults.flat()
-              setFiles(allFiles)
-              
-              // Carica i G-code per i file caricati
-              if (allFiles.length > 0) {
-                try {
-                  const results = await Promise.all(allFiles.map(f => listGcode({ file_origine_id: f.id })))
-                  // Mappa fileOrigine.id -> array di Gcode SOLO se almeno uno presente
-                  const gcodeMap = new Map<number, Gcode[]>()
-                  allFiles.forEach((f, idx) => {
-                    const arr = results[idx]
-                    if (Array.isArray(arr) && arr.length > 0) {
-                      gcodeMap.set(f.id, arr)
-                    }
-                  })
-                  setGcodeMap(gcodeMap)
-                } catch (error) {
-                  console.error('Errore caricamento G-code:', error)
-                  setGcodeMap(new Map())
-                }
-              } else {
-                setGcodeMap(new Map())
-              }
-            })
-            .catch(console.error)
+          } else {
+            setFiles([])
+            setGcodeMap(new Map())
+          }
         }
+      } catch (error) {
+        console.error('Errore caricamento file:', error)
+        setFiles([])
+        setGcodeMap(new Map())
+      } finally {
+        setFilesLoading(false)
       }
     }
-  }, [loading, isSuperuser, orgs])
+  }, [loading, isSuperuser, orgs, orgsLoading, commesseLoading])
 
   // Retry automatico ogni 10 secondi quando in loading
-  useRetryFetch(loading, loadFiles, {
+  useRetryFetch(filesLoading, loadFiles, {
     retryInterval: 10000,
     enabled: true
   })
@@ -379,10 +401,21 @@ export default function FilesPage() {
 
 
 
-  if (loading) {
+  // Show loading until all data is loaded
+  const isDataLoading = loading || orgsLoading || commesseLoading || filesLoading
+
+  if (isDataLoading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
-        <span className="loading loading-spinner loading-lg"></span>
+        <div className="text-center">
+          <span className="loading loading-spinner loading-lg"></span>
+          <p className="mt-4 text-base-content/70">
+            {loading && "Caricamento utente..."}
+            {!loading && orgsLoading && "Caricamento organizzazioni..."}
+            {!loading && !orgsLoading && commesseLoading && "Caricamento commesse..."}
+            {!loading && !orgsLoading && !commesseLoading && filesLoading && "Caricamento file..."}
+          </p>
+        </div>
       </div>
     )
   }
@@ -466,12 +499,14 @@ export default function FilesPage() {
           Visualizzati {filteredRighe.length} file su {files.length} totali
         </p>
       </div>
-      <TabellaFile
-        righe={filteredRighe}
-        onAssocia={handleAssocia}
-        showOrganizzazione={isSuperuser || orgs.length > 1}
-        isSuperuser={isSuperuser}
-      />
+      {!isDataLoading && (
+        <TabellaFile
+          righe={filteredRighe}
+          onAssocia={handleAssocia}
+          showOrganizzazione={isSuperuser || orgs.length > 1}
+          isSuperuser={isSuperuser}
+        />
+      )}
       <ConfirmModal
         open={!!deleteTarget}
         title="Conferma eliminazione"
