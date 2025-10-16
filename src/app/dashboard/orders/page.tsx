@@ -90,49 +90,39 @@ export default function OrdersPage() {
             console.log('OrdersPage: No orders found in database')
           }
           
-          // Carica i G-code per tutti gli ordini (solo quelli con gcode_id non null)
+          // Carica i G-code per tutti gli ordini ONCE (non in loop!)
           const gcodeIds = [...new Set(ordersList.map(o => o.gcode_id).filter(id => id !== null))] as number[]
-          const gcodeMap = new Map<number, Gcode>()
           
-          for (const gcodeId of gcodeIds) {
+          if (gcodeIds.length > 0) {
             try {
-              const gcodeList = await listGcode({ file_origine_id: undefined })
-              const gcode = gcodeList.find(g => g.id === gcodeId)
-              if (gcode) {
-                gcodeMap.set(gcodeId, gcode)
-              }
-            } catch (err) {
-              console.error('Errore caricamento G-code:', err)
-            }
-          }
-          
-          setGcodes(gcodeMap)
-
-          // Carica file origine associati agli ordini
-          // Recupera file_origine_id dai gcode associati agli ordini
-          const fileOrigineIds = new Set<number>()
-          
-          // Recupera dai gcode
-          const gcodeIdsForFiles = [...new Set(ordersList.map(o => o.gcode_id).filter(id => id !== null))] as number[]
-          if (gcodeIdsForFiles.length > 0) {
-            try {
-              const gcodeList = await listGcode({ file_origine_id: undefined })
-              gcodeIdsForFiles.forEach(gcodeId => {
-                const gcode = gcodeList.find(g => g.id === gcodeId)
+              // Fetch ALL gcodes once instead of in a loop!
+              const allGcodes = await listGcode({ file_origine_id: undefined })
+              
+              // Create maps for fast lookup
+              const gcodeMap = new Map<number, Gcode>()
+              const fileOrigineIds = new Set<number>()
+              
+              // Filter to only the gcodes we need
+              gcodeIds.forEach(gcodeId => {
+                const gcode = allGcodes.find(g => g.id === gcodeId)
                 if (gcode) {
+                  gcodeMap.set(gcodeId, gcode)
                   fileOrigineIds.add(gcode.file_origine_id)
                 }
               })
+              
+              setGcodes(gcodeMap)
+              
+              // Load file origine data in parallel
+              if (fileOrigineIds.size > 0) {
+                const fileOrigineArr = await listFileOrigineByIds([...fileOrigineIds])
+                const fileMap = new Map<number, FileOrigine>()
+                fileOrigineArr.forEach(f => fileMap.set(f.id, f))
+                setFileOrigineMap(fileMap)
+              }
             } catch (err) {
-              console.error('Errore caricamento gcode per file origine:', err)
+              console.error('Errore caricamento dati ordini:', err)
             }
-          }
-          
-          if (fileOrigineIds.size > 0) {
-            const fileOrigineArr = await listFileOrigineByIds([...fileOrigineIds])
-            const fileMap = new Map<number, FileOrigine>()
-            fileOrigineArr.forEach(f => fileMap.set(f.id, f))
-            setFileOrigineMap(fileMap)
           }
         })
         .catch(err => {

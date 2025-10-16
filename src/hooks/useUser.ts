@@ -11,39 +11,57 @@ export function useUser() {
   const [error, setError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
   const isFetchingRef = useRef(false)
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const hardTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const hasInitialLoadRef = useRef(false)
 
   const fetchUser = useCallback(async () => {
     // Prevent multiple simultaneous calls
     if (isFetchingRef.current) {
+      console.log('⏭️ Skipping fetchUser - already fetching')
       return
     }
 
+    console.log('🔍 fetchUser called, loading:', loading, 'hasInitialLoad:', hasInitialLoadRef.current)
     isFetchingRef.current = true
     setError(null)
 
-    // Set a hard timeout to prevent infinite loading (only on first load)
-    const hardTimeout = setTimeout(() => {
-      if (isFetchingRef.current) {
-        console.warn('⏱️ Auth check timed out, assuming no session')
-        setUser(null)
-        setLoading(false)
-        isFetchingRef.current = false
+    // Set a hard timeout ONLY on first load to prevent infinite loading
+    if (!hasInitialLoadRef.current) {
+      // Clear any existing timeout first
+      if (hardTimeoutRef.current) {
+        clearTimeout(hardTimeoutRef.current)
       }
-    }, 8000) // 8 second hard limit (increased for slower connections)
+      
+      hardTimeoutRef.current = setTimeout(() => {
+        if (isFetchingRef.current && !user) {
+          console.warn('⏱️ Initial auth check timed out, assuming no session')
+          setUser(null)
+          setLoading(false)
+          isFetchingRef.current = false
+          hasInitialLoadRef.current = true
+        }
+      }, 8000) // 8 second hard limit
+    }
 
     try {
       // Simply get the current session without forcing refresh on load
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       
       // Clear timeout as soon as we get a response
-      clearTimeout(hardTimeout)
+      if (hardTimeoutRef.current) {
+        clearTimeout(hardTimeoutRef.current)
+        hardTimeoutRef.current = null
+      }
+      
+      // Mark that initial load has completed
+      hasInitialLoadRef.current = true
       
       if (sessionError) {
         console.error('❌ Session error:', sessionError)
         setUser(null)
         setLoading(false)
         setError(null) // Don't show error for missing session
+        isFetchingRef.current = false
         return
       }
       
@@ -82,23 +100,21 @@ export function useUser() {
         setRetryCount(0) // Reset retry count on success
       }
     } catch (err) {
-      clearTimeout(hardTimeout)
+      if (hardTimeoutRef.current) {
+        clearTimeout(hardTimeoutRef.current)
+        hardTimeoutRef.current = null
+      }
       console.error('💥 Errore nel caricamento utente:', err)
       setUser(null)
       setError(null) // Don't show error on initial load failures
       
-      // Stop loading after max retries
-      if (retryCount >= 1) {
-        setLoading(false)
-      }
+      // Always stop loading on error
+      setLoading(false)
     } finally {
       isFetchingRef.current = false
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-        timeoutRef.current = null
-      }
     }
-  }, [retryCount])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [retryCount, user])
 
   // Retry automatico con intervalli più lunghi e limite massimo
   useRetryFetch(loading, fetchUser, {
@@ -111,31 +127,87 @@ export function useUser() {
     fetchUser()
 
     // Silently refresh session periodically to keep it alive (only if session exists)
+    // Supabase default token expiration is 1 hour (3600 seconds)
+    // We refresh at 50 minutes to be safe
     const refreshInterval = setInterval(async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (session) {
-          // Silently refresh the session in the background
+          console.log('🔄 Background session refresh triggered')
           await supabase.auth.refreshSession()
         }
       } catch (error) {
         // Silently fail - don't disrupt the user experience
         console.debug('Background session refresh failed:', error)
       }
-    }, 30000) // Refresh every 30 seconds
+    }, 50 * 60 * 1000) // Refresh every 50 minutes (3000 seconds)
 
+    // Debounce auth state changes to avoid multiple rapid-fire updates
+    let authStateChangeTimeout: NodeJS.Timeout | null = null
+    
     // Ascolta i cambiamenti di autenticazione
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: Session | null) => {
       console.log('🔔 Auth state change:', event, session ? 'Session exists' : 'No session')
+      
+      // Clear any pending hard timeout when auth state changes
+      if (hardTimeoutRef.current) {
+        clearTimeout(hardTimeoutRef.current)
+        hardTimeoutRef.current = null
+      }
+      
+      // Clear any pending auth state change timeout
+      if (authStateChangeTimeout) {
+        clearTimeout(authStateChangeTimeout)
+      }
       
       if (event === 'SIGNED_OUT') {
         setUser(null)
         setLoading(false)
         setError(null)
         setRetryCount(0)
+      } else if (event === 'INITIAL_SESSION') {
+        // Skip INITIAL_SESSION if we already loaded initial data
+        if (hasInitialLoadRef.current && user) {
+          console.log('⏭️ Skipping INITIAL_SESSION - already have user data')
+          return
+        }
+        
+        // Debounce INITIAL_SESSION to handle multiple rapid events
+        authStateChangeTimeout = setTimeout(async () => {
+          if (session) {
+            const { data, error } = await supabase
+              .from('utente')
+              .select('*')
+              .eq('id', session.user.id)
+              .single()
+            
+            if (error || !data) {
+              const meta = session.user.user_metadata as Record<string, unknown> | undefined
+              setUser({
+                id: session.user.id,
+                email: session.user.email || '',
+                nome: typeof meta?.nome === 'string' ? meta.nome : '',
+                cognome: typeof meta?.cognome === 'string' ? meta.cognome : '',
+                created_at: new Date().toISOString(),
+                is_superuser: false,
+              })
+            } else {
+              setUser(data as Utente)
+            }
+            setLoading(false)
+            setError(null)
+            setRetryCount(0)
+          }
+        }, 300) // 300ms debounce - wait for dust to settle
       } else if (session) {
-        // Update user data for any event that has a valid session
-        // This includes SIGNED_IN, TOKEN_REFRESHED, INITIAL_SESSION, etc.
+        // For TOKEN_REFRESHED, skip DB fetch if we already have user data for this user
+        if (event === 'TOKEN_REFRESHED' && user && user.id === session.user.id) {
+          console.log('⏭️ Token refreshed, keeping existing user data')
+          setLoading(false)
+          return
+        }
+        
+        // For SIGNED_IN or different user - fetch from DB
         const { data, error } = await supabase
           .from('utente')
           .select('*')
@@ -164,12 +236,16 @@ export function useUser() {
     return () => {
       subscription.unsubscribe()
       clearInterval(refreshInterval)
-      // Cleanup timeout on unmount
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-        timeoutRef.current = null
+      // Cleanup timeouts on unmount
+      if (hardTimeoutRef.current) {
+        clearTimeout(hardTimeoutRef.current)
+        hardTimeoutRef.current = null
+      }
+      if (authStateChangeTimeout) {
+        clearTimeout(authStateChangeTimeout)
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchUser])
 
   return { loading, user, error, retryCount }
