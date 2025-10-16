@@ -221,7 +221,7 @@ export function useUser() {
             .single()
           
           const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Database query timeout')), 5000)
+            setTimeout(() => reject(new Error('Database query timeout')), 2000)
           )
           
           const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any
